@@ -19,7 +19,7 @@ void uart2_init (void)
 #ifdef DEBUG_UART
   UART2_Init((uint32_t) 115200,
 #else
-  UART2_Init((uint32_t) 9600,
+  UART2_Init((uint32_t) 19200,
 #endif
 	     UART2_WORDLENGTH_8D,
 	     UART2_STOPBITS_1,

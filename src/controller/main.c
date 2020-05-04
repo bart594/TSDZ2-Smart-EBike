@@ -50,7 +50,8 @@ int main (void);
 // PWM cycle interrupt
 void TIM1_CAP_COM_IRQHandler(void) __interrupt(TIM1_CAP_COM_IRQHANDLER);
 void EXTI_PORTC_IRQHandler(void) __interrupt(EXTI_PORTC_IRQHANDLER);
-void UART2_IRQHandler(void) __interrupt(UART2_IRQHANDLER);
+void UART2_RX_IRQHandler(void) __interrupt(UART2_RX_IRQHANDLER);
+void UART2_TX_IRQHandler(void) __interrupt(UART2_TX_IRQHANDLER);
 
 /////////////////////////////////////////////////////////////////////////////////////////////
 /////////////////////////////////////////////////////////////////////////////////////////////
@@ -95,7 +96,7 @@ int main (void)
     }
 
     ui16_TIM3_counter = TIM3_GetCounter();
-    if((ui16_TIM3_counter - ui16_ebike_app_controller_counter) > 100) // every 100ms
+    if((ui16_TIM3_counter - ui16_ebike_app_controller_counter) > 60) // every 60ms
     {
       ui16_ebike_app_controller_counter = ui16_TIM3_counter;
       ebike_app_controller();

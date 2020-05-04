@@ -14,7 +14,7 @@
 #define OFF_MODE                                  0
 #define POWER_ASSIST_MODE                         1
 #define TORQUE_ASSIST_MODE                        2
-#define CADENCE_ASSIST_MODE                       3
+#define MIXED_ASSIST_MODE                         3
 #define eMTB_ASSIST_MODE                          4
 #define WALK_ASSIST_MODE                          5
 #define CRUISE_MODE                               6
@@ -30,6 +30,11 @@
 #define ERROR_NO_SPEED_SENSOR_DETECTED            5
 #define ERROR_LOW_CONTROLLER_VOLTAGE              6   // controller works with no less than 15 V so give error code if voltage is too low
 #define ERROR_CADENCE_SENSOR_CALIBRATION          7
+#define ERROR_UART_LOST_COMMUNICATION             8
+
+// uart packet types
+#define UART_PACKET_REGULAR          			  1
+#define UART_PACKET_CONFIG						  2    
 
 
 // walk assist

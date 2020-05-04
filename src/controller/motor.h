@@ -44,6 +44,11 @@ extern volatile uint8_t ui8_fix_overrun_enabled;
 extern volatile uint16_t ui16_wheel_speed_sensor_ticks;
 extern volatile uint32_t ui32_wheel_speed_sensor_ticks_total;
 
+// field weakening
+extern volatile uint8_t ui8_field_weakening_angle;
+extern volatile uint8_t ui8_field_weakening_enabled;
+extern volatile uint8_t ui8_field_weakening_state_enabled;
+
 
 void hall_sensor_init (void); // must be called before using the motor
 void motor_enable_PWM (void);

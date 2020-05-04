@@ -9,6 +9,7 @@
 #include "ebike_app.h"
 #include <stdint.h>
 #include <stdio.h>
+#include <string.h>
 #include "stm8s.h"
 #include "stm8s_gpio.h"
 #include "main.h"
@@ -44,7 +45,7 @@ static uint8_t    ui8_battery_current_filtered_x10 = 0;
 static uint8_t    ui8_adc_battery_current_max = ADC_10_BIT_BATTERY_CURRENT_MAX;
 static uint8_t    ui8_adc_battery_current_target = 0;
 static uint8_t    ui8_duty_cycle_target = 0;
-
+static uint8_t	  ui8_field_weakening_current = 0;
 
 // brakes
 static uint8_t ui8_brakes_engaged = 0;
@@ -62,7 +63,7 @@ volatile uint16_t ui16_adc_pedal_torque = 0;
 static uint16_t   ui16_adc_pedal_torque_delta = 0;
 static uint16_t   ui16_human_power_x10 = 0;
 static uint16_t   ui16_pedal_torque_x100 = 0;
-
+volatile uint16_t  ui16_m_torque_sensor_weight_x10 = 0;
 
 // wheel speed sensor
 static uint16_t   ui16_wheel_speed_x10 = 0;
@@ -76,8 +77,29 @@ volatile uint8_t  ui8_adc_throttle = 0;
 static uint16_t ui16_motor_temperature_filtered_x10 = 0;
 static uint8_t ui8_motor_temperature_max_value_to_limit = 0;
 static uint8_t ui8_motor_temperature_min_value_to_limit = 0;
-static uint8_t ui8_temperature_current_limiting_value = 0;
+//static uint8_t ui8_temperature_current_limiting_value = 0;
 
+// mixed assist
+static uint8_t ui8_torque_multiply_factor = 2;
+static uint8_t ui8_cadence_RPM_switch = 0;
+//torque linearization
+static uint8_t ui8_torque_linearization_enabled = 0;
+
+#define TORQUE_SENSOR_LINEARIZE_NR_POINTS 6
+
+uint16_t ui16_torque_sensor_linear_values[TORQUE_SENSOR_LINEARIZE_NR_POINTS * 2];
+
+/*uint16_t ui16_torque_sensor_linearize[TORQUE_SENSOR_LINEARIZE_NR_POINTS * 2] =
+{
+  // ADC 10 bits step, steps_per_kg_x100
+  0, 20,
+  210, 20,
+  240, 33,
+  260  50,
+  290, 90,
+  310, 170,
+};
+*/
 
 // eMTB assist
 #define eMTB_POWER_FUNCTION_ARRAY_SIZE      241
@@ -87,57 +109,35 @@ static const uint8_t ui8_eMTB_power_function_165[eMTB_POWER_FUNCTION_ARRAY_SIZE]
 static const uint8_t ui8_eMTB_power_function_170[eMTB_POWER_FUNCTION_ARRAY_SIZE] = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 2, 2, 2, 2, 2, 2, 3, 3, 3, 3, 3, 3, 4, 4, 4, 4, 4, 5, 5, 5, 5, 6, 6, 6, 6, 6, 7, 7, 7, 7, 8, 8, 8, 9, 9, 9, 9, 10, 10, 10, 11, 11, 11, 11, 12, 12, 12, 13, 13, 13, 14, 14, 14, 15, 15, 15, 16, 16, 16, 17, 17, 18, 18, 18, 19, 19, 19, 20, 20, 21, 21, 21, 22, 22, 23, 23, 23, 24, 24, 25, 25, 26, 26, 26, 27, 27, 28, 28, 29, 29, 30, 30, 30, 31, 31, 32, 32, 33, 33, 34, 34, 35, 35, 36, 36, 37, 37, 38, 38, 39, 39, 40, 40, 41, 41, 42, 42, 43, 43, 44, 45, 45, 46, 46, 47, 47, 48, 48, 49, 49, 50, 51, 51, 52, 52, 53, 53, 54, 55, 55, 56, 56, 57, 58, 58, 59, 59, 60, 61, 61, 62, 63, 63, 64, 64, 65, 66, 66, 67, 68, 68, 69, 70, 70, 71, 71, 72, 73, 73, 74, 75, 75, 76, 77, 77, 78, 79, 80, 80, 81, 82, 82, 83, 84, 84, 85, 86, 87, 87, 88, 89, 89, 90, 91, 92, 92, 93, 94, 94, 95, 96, 97, 97, 98, 99, 100, 100, 101, 102, 103, 103, 104, 105, 106, 107, 107, 108, 109, 110, 110, 111 };
 static const uint8_t ui8_eMTB_power_function_175[eMTB_POWER_FUNCTION_ARRAY_SIZE] = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 2, 2, 2, 2, 2, 2, 3, 3, 3, 3, 3, 4, 4, 4, 4, 5, 5, 5, 5, 6, 6, 6, 6, 7, 7, 7, 8, 8, 8, 8, 9, 9, 9, 10, 10, 10, 11, 11, 11, 12, 12, 13, 13, 13, 14, 14, 14, 15, 15, 16, 16, 17, 17, 17, 18, 18, 19, 19, 20, 20, 20, 21, 21, 22, 22, 23, 23, 24, 24, 25, 25, 26, 26, 27, 27, 28, 28, 29, 29, 30, 31, 31, 32, 32, 33, 33, 34, 34, 35, 36, 36, 37, 37, 38, 39, 39, 40, 40, 41, 42, 42, 43, 44, 44, 45, 45, 46, 47, 47, 48, 49, 49, 50, 51, 51, 52, 53, 53, 54, 55, 56, 56, 57, 58, 58, 59, 60, 61, 61, 62, 63, 64, 64, 65, 66, 67, 67, 68, 69, 70, 70, 71, 72, 73, 74, 74, 75, 76, 77, 78, 78, 79, 80, 81, 82, 83, 83, 84, 85, 86, 87, 88, 88, 89, 90, 91, 92, 93, 94, 95, 95, 96, 97, 98, 99, 100, 101, 102, 103, 104, 105, 105, 106, 107, 108, 109, 110, 111, 112, 113, 114, 115, 116, 117, 118, 119, 120, 121, 122, 123, 124, 125, 126, 127, 128, 129, 130, 131, 132, 133, 134, 135, 136, 137, 138, 139, 140, 141, 142, 143, 144, 145, 146 };
 static const uint8_t ui8_eMTB_power_function_180[eMTB_POWER_FUNCTION_ARRAY_SIZE] = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 2, 2, 2, 2, 2, 3, 3, 3, 3, 4, 4, 4, 4, 5, 5, 5, 5, 6, 6, 6, 7, 7, 7, 8, 8, 8, 9, 9, 9, 10, 10, 11, 11, 11, 12, 12, 13, 13, 14, 14, 14, 15, 15, 16, 16, 17, 17, 18, 18, 19, 19, 20, 20, 21, 21, 22, 23, 23, 24, 24, 25, 25, 26, 27, 27, 28, 28, 29, 30, 30, 31, 32, 32, 33, 34, 34, 35, 36, 36, 37, 38, 38, 39, 40, 41, 41, 42, 43, 43, 44, 45, 46, 46, 47, 48, 49, 50, 50, 51, 52, 53, 54, 54, 55, 56, 57, 58, 59, 59, 60, 61, 62, 63, 64, 65, 66, 67, 67, 68, 69, 70, 71, 72, 73, 74, 75, 76, 77, 78, 79, 80, 81, 82, 83, 84, 85, 86, 87, 88, 89, 90, 91, 92, 93, 94, 95, 96, 97, 98, 99, 100, 101, 102, 103, 105, 106, 107, 108, 109, 110, 111, 112, 114, 115, 116, 117, 118, 119, 120, 122, 123, 124, 125, 126, 128, 129, 130, 131, 132, 134, 135, 136, 137, 139, 140, 141, 142, 144, 145, 146, 147, 149, 150, 151, 153, 154, 155, 157, 158, 159, 161, 162, 163, 165, 166, 167, 169, 170, 171, 173, 174, 176, 177, 178, 180, 181, 182, 184, 185, 187, 188, 190, 191, 192 };
-static const uint8_t ui8_eMTB_power_function_185[eMTB_POWER_FUNCTION_ARRAY_SIZE] = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 2, 2, 2, 2, 3, 3, 3, 3, 4, 4, 4, 4, 5, 5, 5, 6, 6, 6, 7, 7, 8, 8, 8, 9, 9, 10, 10, 11, 11, 11, 12, 12, 13, 13, 14, 14, 15, 15, 16, 17, 17, 18, 18, 19, 19, 20, 21, 21, 22, 23, 23, 24, 25, 25, 26, 27, 27, 28, 29, 29, 30, 31, 32, 32, 33, 34, 35, 36, 36, 37, 38, 39, 40, 40, 41, 42, 43, 44, 45, 46, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 65, 66, 67, 68, 69, 70, 71, 72, 74, 75, 76, 77, 78, 79, 80, 81, 83, 84, 85, 86, 87, 89, 90, 91, 92, 93, 95, 96, 97, 98, 100, 101, 102, 104, 105, 106, 107, 109, 110, 111, 113, 114, 115, 117, 118, 120, 121, 122, 124, 125, 127, 128, 129, 131, 132, 134, 135, 137, 138, 140, 141, 143, 144, 146, 147, 149, 150, 152, 153, 155, 156, 158, 160, 161, 163, 164, 166, 168, 169, 171, 172, 174, 176, 177, 179, 181, 182, 184, 186, 187, 189, 191, 193, 194, 196, 198, 199, 201, 203, 205, 207, 208, 210, 212, 214, 216, 217, 219, 221, 223, 225, 227, 228, 230, 232, 234, 236, 238, 240, 240, 240, 240, 240, 240, 240, 240 };
-static const uint8_t ui8_eMTB_power_function_190[eMTB_POWER_FUNCTION_ARRAY_SIZE] = { 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 2, 2, 2, 2, 2, 3, 3, 3, 4, 4, 4, 5, 5, 5, 6, 6, 6, 7, 7, 8, 8, 9, 9, 10, 10, 11, 11, 12, 12, 13, 13, 14, 14, 15, 16, 16, 17, 18, 18, 19, 20, 20, 21, 22, 22, 23, 24, 25, 25, 26, 27, 28, 29, 29, 30, 31, 32, 33, 34, 35, 36, 37, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 51, 52, 53, 54, 55, 56, 57, 58, 60, 61, 62, 63, 64, 66, 67, 68, 69, 70, 72, 73, 74, 76, 77, 78, 80, 81, 82, 84, 85, 86, 88, 89, 91, 92, 94, 95, 96, 98, 99, 101, 102, 104, 105, 107, 108, 110, 112, 113, 115, 116, 118, 120, 121, 123, 124, 126, 128, 130, 131, 133, 135, 136, 138, 140, 142, 143, 145, 147, 149, 150, 152, 154, 156, 158, 160, 162, 163, 165, 167, 169, 171, 173, 175, 177, 179, 181, 183, 185, 187, 189, 191, 193, 195, 197, 199, 201, 203, 205, 207, 209, 211, 214, 216, 218, 220, 222, 224, 227, 229, 231, 233, 235, 238, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240 };
 static const uint8_t ui8_eMTB_power_function_195[eMTB_POWER_FUNCTION_ARRAY_SIZE] = { 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 2, 2, 2, 3, 3, 3, 3, 4, 4, 5, 5, 5, 6, 6, 7, 7, 8, 8, 9, 9, 10, 10, 11, 11, 12, 13, 13, 14, 15, 15, 16, 17, 17, 18, 19, 20, 21, 21, 22, 23, 24, 25, 26, 27, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 39, 40, 41, 42, 43, 44, 45, 47, 48, 49, 50, 51, 53, 54, 55, 57, 58, 59, 61, 62, 63, 65, 66, 68, 69, 70, 72, 73, 75, 76, 78, 79, 81, 83, 84, 86, 87, 89, 91, 92, 94, 96, 97, 99, 101, 103, 104, 106, 108, 110, 112, 113, 115, 117, 119, 121, 123, 125, 127, 129, 131, 132, 134, 136, 139, 141, 143, 145, 147, 149, 151, 153, 155, 157, 160, 162, 164, 166, 168, 171, 173, 175, 177, 180, 182, 184, 187, 189, 191, 194, 196, 199, 201, 203, 206, 208, 211, 213, 216, 218, 221, 224, 226, 229, 231, 234, 237, 239, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240 };
-static const uint8_t ui8_eMTB_power_function_200[eMTB_POWER_FUNCTION_ARRAY_SIZE] = { 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 2, 2, 2, 3, 3, 3, 4, 4, 4, 5, 5, 6, 6, 7, 7, 8, 8, 9, 10, 10, 11, 12, 12, 13, 14, 14, 15, 16, 17, 18, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 34, 35, 36, 37, 38, 40, 41, 42, 44, 45, 46, 48, 49, 50, 52, 53, 55, 56, 58, 59, 61, 62, 64, 66, 67, 69, 71, 72, 74, 76, 77, 79, 81, 83, 85, 86, 88, 90, 92, 94, 96, 98, 100, 102, 104, 106, 108, 110, 112, 114, 117, 119, 121, 123, 125, 128, 130, 132, 135, 137, 139, 142, 144, 146, 149, 151, 154, 156, 159, 161, 164, 166, 169, 172, 174, 177, 180, 182, 185, 188, 190, 193, 196, 199, 202, 204, 207, 210, 213, 216, 219, 222, 225, 228, 231, 234, 237, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240 };
-static const uint8_t ui8_eMTB_power_function_205[eMTB_POWER_FUNCTION_ARRAY_SIZE] = { 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 2, 2, 2, 3, 3, 3, 4, 4, 5, 5, 6, 6, 7, 7, 8, 9, 9, 10, 11, 11, 12, 13, 14, 15, 16, 16, 17, 18, 19, 20, 21, 22, 23, 24, 26, 27, 28, 29, 30, 32, 33, 34, 36, 37, 38, 40, 41, 43, 44, 46, 47, 49, 50, 52, 54, 55, 57, 59, 61, 62, 64, 66, 68, 70, 72, 74, 76, 78, 80, 82, 84, 86, 88, 90, 92, 95, 97, 99, 101, 104, 106, 108, 111, 113, 116, 118, 121, 123, 126, 128, 131, 134, 136, 139, 142, 145, 147, 150, 153, 156, 159, 162, 165, 168, 171, 174, 177, 180, 183, 186, 189, 192, 196, 199, 202, 205, 209, 212, 216, 219, 222, 226, 229, 233, 236, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240 };
 static const uint8_t ui8_eMTB_power_function_210[eMTB_POWER_FUNCTION_ARRAY_SIZE] = { 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 2, 2, 2, 3, 3, 3, 4, 4, 5, 5, 6, 7, 7, 8, 9, 9, 10, 11, 12, 13, 14, 14, 15, 16, 17, 19, 20, 21, 22, 23, 24, 26, 27, 28, 30, 31, 32, 34, 35, 37, 39, 40, 42, 43, 45, 47, 49, 50, 52, 54, 56, 58, 60, 62, 64, 66, 68, 71, 73, 75, 77, 80, 82, 84, 87, 89, 92, 94, 97, 99, 102, 104, 107, 110, 113, 115, 118, 121, 124, 127, 130, 133, 136, 139, 142, 145, 149, 152, 155, 158, 162, 165, 169, 172, 176, 179, 183, 186, 190, 194, 197, 201, 205, 209, 213, 216, 220, 224, 228, 232, 237, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240 };
-static const uint8_t ui8_eMTB_power_function_215[eMTB_POWER_FUNCTION_ARRAY_SIZE] = { 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 2, 2, 2, 3, 3, 4, 4, 5, 6, 6, 7, 8, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 20, 21, 22, 24, 25, 26, 28, 29, 31, 33, 34, 36, 38, 39, 41, 43, 45, 47, 49, 51, 53, 55, 57, 60, 62, 64, 67, 69, 71, 74, 76, 79, 82, 84, 87, 90, 93, 96, 98, 101, 104, 107, 111, 114, 117, 120, 123, 127, 130, 134, 137, 141, 144, 148, 152, 155, 159, 163, 167, 171, 175, 179, 183, 187, 191, 195, 200, 204, 208, 213, 217, 222, 226, 231, 235, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240 };
-static const uint8_t ui8_eMTB_power_function_220[eMTB_POWER_FUNCTION_ARRAY_SIZE] = { 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 2, 2, 2, 3, 3, 4, 4, 5, 6, 7, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 18, 19, 20, 22, 23, 25, 27, 28, 30, 32, 33, 35, 37, 39, 41, 43, 46, 48, 50, 52, 55, 57, 60, 62, 65, 67, 70, 73, 76, 79, 82, 85, 88, 91, 94, 97, 101, 104, 108, 111, 115, 118, 122, 126, 130, 133, 137, 141, 145, 150, 154, 158, 162, 167, 171, 176, 180, 185, 190, 194, 199, 204, 209, 214, 219, 224, 230, 235, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240 };
 static const uint8_t ui8_eMTB_power_function_225[eMTB_POWER_FUNCTION_ARRAY_SIZE] = { 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 2, 2, 3, 3, 4, 4, 5, 6, 7, 8, 8, 9, 10, 12, 13, 14, 15, 17, 18, 20, 21, 23, 24, 26, 28, 30, 32, 34, 36, 38, 40, 43, 45, 47, 50, 52, 55, 58, 61, 64, 66, 70, 73, 76, 79, 82, 86, 89, 93, 96, 100, 104, 108, 112, 116, 120, 124, 128, 133, 137, 142, 146, 151, 156, 161, 166, 171, 176, 181, 186, 191, 197, 202, 208, 214, 219, 225, 231, 237, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240 };
-static const uint8_t ui8_eMTB_power_function_230[eMTB_POWER_FUNCTION_ARRAY_SIZE] = { 0, 0, 0, 0, 0, 0, 1, 1, 1, 2, 2, 2, 3, 4, 4, 5, 6, 7, 8, 9, 10, 11, 12, 14, 15, 16, 18, 20, 21, 23, 25, 27, 29, 31, 33, 36, 38, 40, 43, 46, 48, 51, 54, 57, 60, 63, 67, 70, 74, 77, 81, 85, 88, 92, 96, 101, 105, 109, 114, 118, 123, 128, 133, 138, 143, 148, 153, 158, 164, 170, 175, 181, 187, 193, 199, 205, 212, 218, 225, 231, 238, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240 };
-static const uint8_t ui8_eMTB_power_function_235[eMTB_POWER_FUNCTION_ARRAY_SIZE] = { 0, 0, 0, 0, 0, 0, 1, 1, 1, 2, 2, 3, 3, 4, 5, 6, 7, 8, 9, 10, 11, 13, 14, 16, 18, 19, 21, 23, 25, 27, 30, 32, 34, 37, 40, 43, 45, 48, 52, 55, 58, 62, 65, 69, 73, 77, 81, 85, 89, 94, 98, 103, 108, 113, 118, 123, 128, 134, 139, 145, 151, 157, 163, 169, 176, 182, 189, 196, 202, 210, 217, 224, 232, 239, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240 };
 static const uint8_t ui8_eMTB_power_function_240[eMTB_POWER_FUNCTION_ARRAY_SIZE] = { 0, 0, 0, 0, 0, 0, 1, 1, 1, 2, 3, 3, 4, 5, 6, 7, 8, 9, 10, 12, 13, 15, 17, 19, 21, 23, 25, 27, 30, 32, 35, 38, 41, 44, 47, 51, 54, 58, 62, 66, 70, 74, 79, 83, 88, 93, 98, 103, 108, 114, 120, 125, 131, 137, 144, 150, 157, 164, 171, 178, 185, 193, 200, 208, 216, 224, 233, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240 };
-static const uint8_t ui8_eMTB_power_function_245[eMTB_POWER_FUNCTION_ARRAY_SIZE] = { 0, 0, 0, 0, 0, 1, 1, 1, 2, 2, 3, 4, 4, 5, 6, 8, 9, 10, 12, 14, 15, 17, 19, 22, 24, 27, 29, 32, 35, 38, 42, 45, 49, 53, 57, 61, 65, 70, 74, 79, 84, 89, 95, 100, 106, 112, 119, 125, 132, 138, 145, 153, 160, 168, 176, 184, 192, 200, 209, 218, 227, 237, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240 };
-static const uint8_t ui8_eMTB_power_function_250[eMTB_POWER_FUNCTION_ARRAY_SIZE] = { 0, 0, 0, 0, 0, 1, 1, 1, 2, 2, 3, 4, 5, 6, 7, 9, 10, 12, 14, 16, 18, 20, 23, 25, 28, 31, 34, 38, 41, 45, 49, 54, 58, 63, 67, 72, 78, 83, 89, 95, 101, 108, 114, 121, 128, 136, 144, 151, 160, 168, 177, 186, 195, 204, 214, 224, 235, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240 };
 static const uint8_t ui8_eMTB_power_function_255[eMTB_POWER_FUNCTION_ARRAY_SIZE] = { 0, 0, 0, 0, 0, 1, 1, 1, 2, 3, 4, 5, 6, 7, 8, 10, 12, 14, 16, 18, 21, 24, 26, 30, 33, 37, 41, 45, 49, 54, 58, 64, 69, 75, 80, 87, 93, 100, 107, 114, 122, 130, 138, 146, 155, 164, 174, 184, 194, 204, 215, 226, 238, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240 };
-
 
 // cruise
 static uint8_t ui8_cruise_PID_initialize = 1;
 
-
-// boost
-uint8_t   ui8_startup_boost_enable = 0;
-uint8_t   ui8_startup_boost_fade_enable = 0;
-uint8_t   ui8_m_startup_boost_state_machine = 0;
-uint8_t   ui8_startup_boost_no_torque = 0;
-uint8_t   ui8_startup_boost_timer = 0;
-uint8_t   ui8_startup_boost_fade_steps = 0;
-uint16_t  ui16_startup_boost_fade_variable_x256;
-uint16_t  ui16_startup_boost_fade_variable_step_amount_x256;
-static void     boost_run_statemachine (void);
-static uint8_t  boost(uint8_t ui8_max_current_boost_state);
-static void     apply_boost_fade_out();
-uint8_t ui8_boost_enabled_and_applied = 0;
-static void apply_boost();
-
-
 // UART
-#define UART_NUMBER_DATA_BYTES_TO_RECEIVE   7   // change this value depending on how many data bytes there are to receive ( Package = one start byte + data bytes + two bytes 16 bit CRC )
-#define UART_NUMBER_DATA_BYTES_TO_SEND      26  // change this value depending on how many data bytes there are to send ( Package = one start byte + data bytes + two bytes 16 bit CRC )
+#define UART_NUMBER_DATA_BYTES_TO_RECEIVE   8   // change this value depending on how many data bytes there are to receive ( Package = one start byte + data bytes + two bytes 16 bit CRC )
+#define UART_NUMBER_DATA_BYTES_TO_SEND      23  // change this value depending on how many data bytes there are to send ( Package = one start byte + data bytes + two bytes 16 bit CRC )
 
 volatile uint8_t ui8_received_package_flag = 0;
 volatile uint8_t ui8_rx_buffer[UART_NUMBER_DATA_BYTES_TO_RECEIVE + 3];
 volatile uint8_t ui8_rx_counter = 0;
 volatile uint8_t ui8_tx_buffer[UART_NUMBER_DATA_BYTES_TO_SEND + 3];
+volatile uint8_t ui8_tx_buffer_index;
 volatile uint8_t ui8_i;
 volatile uint8_t ui8_byte_received;
 volatile uint8_t ui8_state_machine = 0;
 static uint16_t  ui16_crc_rx;
 static uint16_t  ui16_crc_tx;
+							 
 volatile uint8_t ui8_message_ID = 0;
+volatile uint8_t ui8_packet_type = UART_PACKET_CONFIG;
+volatile uint8_t ui8_missed_uart_packets = 0;
+volatile uint8_t comm_s = 0;
+		 
 
 static void communications_controller (void);
 static void uart_receive_package (void);
@@ -158,7 +158,7 @@ static void check_brakes(void);
 
 static void apply_power_assist();
 static void apply_torque_assist();
-static void apply_cadence_assist();
+static void apply_mixmode_assist();
 static void apply_emtb_assist();
 static void apply_walk_assist();
 static void apply_cruise();
@@ -166,7 +166,7 @@ static void apply_cadence_sensor_calibration();
 static void apply_throttle();
 static void apply_temperature_limiting();
 static void apply_speed_limit();
-
+static void linearize_torque_sensor_to_kgs(uint16_t *ui16_p_torque_sensor_adc_steps, uint16_t *ui16_torque_sensor_weight);
 
 
 void ebike_app_controller (void)
@@ -215,7 +215,7 @@ static void ebike_control_motor (void)
     
     case TORQUE_ASSIST_MODE: apply_torque_assist(); break;
     
-    case CADENCE_ASSIST_MODE: apply_cadence_assist(); break;
+    case MIXED_ASSIST_MODE: apply_mixmode_assist(); break;
     
     case eMTB_ASSIST_MODE: apply_emtb_assist(); break;
     
@@ -240,7 +240,7 @@ static void ebike_control_motor (void)
   // check if to enable the motor
   if ((!ui8_motor_enabled) &&
       (ui16_motor_get_motor_speed_erps() == 0) && // only enable motor if stopped, else something bad can happen due to high currents/regen or similar
-      (ui8_adc_battery_current_target) &&
+	  (ui8_adc_battery_current_target) &&
       (!ui8_brakes_engaged))
   {
     ui8_motor_enabled = 1;
@@ -354,6 +354,8 @@ static void apply_power_assist()
                                                (uint32_t) PWM_DUTY_CYCLE_RAMP_DOWN_INVERSE_STEP_MIN);
                                                
   // set battery current target
+  if (ui8_field_weakening_state_enabled) {ui16_adc_battery_current_target = ui16_adc_battery_current_target + (ui8_field_weakening_current * ui16_adc_battery_current_target / 100);}
+  
   if (ui16_adc_battery_current_target > ui8_adc_battery_current_max) { ui8_adc_battery_current_target = ui8_adc_battery_current_max; }
   else { ui8_adc_battery_current_target = ui16_adc_battery_current_target; }
   
@@ -379,8 +381,10 @@ static void apply_torque_assist()
   {
     // get the torque assist factor
     uint8_t ui8_torque_assist_factor = ui8_riding_mode_parameter;
-    
-    // calculate torque assist target current
+
+   if (ui8_torque_linearization_enabled){ui16_adc_pedal_torque_delta = ui16_pedal_torque_x100 / 100;}
+  
+   // calculate torque assist target current
     uint16_t ui16_adc_battery_current_target_torque_assist = ((uint16_t) ui16_adc_pedal_torque_delta * ui8_torque_assist_factor) / TORQUE_ASSIST_FACTOR_DENOMINATOR;
   
     // set motor acceleration
@@ -397,7 +401,9 @@ static void apply_torque_assist()
                                                  (uint32_t) PWM_DUTY_CYCLE_RAMP_DOWN_INVERSE_STEP_MIN);
                                                  
     // set battery current target
-    if (ui16_adc_battery_current_target_torque_assist > ui8_adc_battery_current_max) { ui8_adc_battery_current_target = ui8_adc_battery_current_max; }
+	if (ui8_field_weakening_state_enabled) {ui16_adc_battery_current_target_torque_assist = ui16_adc_battery_current_target_torque_assist + (ui8_field_weakening_current * ui16_adc_battery_current_target_torque_assist / 100);}
+    
+	if (ui16_adc_battery_current_target_torque_assist > ui8_adc_battery_current_max) { ui8_adc_battery_current_target = ui8_adc_battery_current_max; }
     else { ui8_adc_battery_current_target = ui16_adc_battery_current_target_torque_assist; }
 
     // set duty cycle target
@@ -408,37 +414,67 @@ static void apply_torque_assist()
 
 
 
-static void apply_cadence_assist()
+static void apply_mixmode_assist()
 {
-  #define CADENCE_ASSIST_DUTY_CYCLE_RAMP_UP_INVERSE_STEP_OFFSET   50
+  #define ADC_PEDAL_TORQUE_THRESHOLD            6     // minimum ADC torque to enable torque assist
+  #define TORQUE_ASSIST_FACTOR_DENOMINATOR      110   // scale the torque assist target current
+    
+	
+	// check for assist without pedal rotation threshold when there is no pedal rotation and standing still
+	if (ui8_assist_without_pedal_rotation_threshold && !ui8_pedal_cadence_RPM && !ui16_wheel_speed_x10)
+	{
+    if (ui16_adc_pedal_torque_delta > (110 - ui8_assist_without_pedal_rotation_threshold)) { ui8_pedal_cadence_RPM = 4; }
+	}
+  	
+	// get the torque assist factor
+  uint8_t ui8_power_assist_multiplier_x10 = ui8_riding_mode_parameter;
   
-  if (ui8_pedal_cadence_RPM)
+    // calculate torque assist from power factor and multiply by x 
+  uint8_t ui8_torque_assist_factor = ui8_riding_mode_parameter * ui8_torque_multiply_factor;
+  
+  // calculate power assist by multipling human power with the power assist multiplier
+  uint32_t ui32_power_assist_x100 = ((uint32_t) ui16_pedal_torque_x100 * ui8_pedal_cadence_RPM * ui8_power_assist_multiplier_x10) / 96; 
+  
+  // calculate target current
+  uint16_t ui16_battery_current_target_x100 = (ui32_power_assist_x100 * 1000) / ui16_battery_voltage_filtered_x1000;
+  
+  // set battery current target in ADC steps
+  uint16_t ui16_adc_battery_current_target = ui16_battery_current_target_x100 / BATTERY_CURRENT_PER_10_BIT_ADC_STEP_X100;
+
+  //apply torque assist if cadence below x
+  if (ui16_adc_pedal_torque_delta && ui8_pedal_cadence_RPM <= ui8_cadence_RPM_switch)
   {
-    // get the cadence assist duty cycle target
-    uint8_t ui8_cadence_assist_duty_cycle_target = ui8_riding_mode_parameter;
-    
-    // limit cadence assist duty cycle target
-    if (ui8_cadence_assist_duty_cycle_target > PWM_DUTY_CYCLE_MAX) { ui8_cadence_assist_duty_cycle_target = PWM_DUTY_CYCLE_MAX; }
-    
-    // set motor acceleration
-    ui16_duty_cycle_ramp_up_inverse_step = map((uint32_t) ui16_wheel_speed_x10,
+
+  if (ui8_torque_linearization_enabled){ui16_adc_pedal_torque_delta = ui16_pedal_torque_x100 / 100;}
+  
+    // calculate torque assist target current
+  uint16_t ui16_adc_battery_current_target = ((uint16_t) ui16_adc_pedal_torque_delta * ui8_torque_assist_factor) / TORQUE_ASSIST_FACTOR_DENOMINATOR;
+	
+  }  
+   
+   // set motor acceleration
+  ui16_duty_cycle_ramp_up_inverse_step = map((uint32_t) ui16_wheel_speed_x10,
+                                             (uint32_t) 40, // 40 -> 4 kph
+                                             (uint32_t) 200, // 200 -> 20 kph
+                                             (uint32_t) ui16_duty_cycle_ramp_up_inverse_step_default,
+                                             (uint32_t) PWM_DUTY_CYCLE_RAMP_UP_INVERSE_STEP_MIN);
+                                             
+  ui16_duty_cycle_ramp_down_inverse_step = map((uint32_t) ui16_wheel_speed_x10,
                                                (uint32_t) 40, // 40 -> 4 kph
                                                (uint32_t) 200, // 200 -> 20 kph
-                                               (uint32_t) ui16_duty_cycle_ramp_up_inverse_step_default + CADENCE_ASSIST_DUTY_CYCLE_RAMP_UP_INVERSE_STEP_OFFSET,
-                                               (uint32_t) PWM_DUTY_CYCLE_RAMP_UP_INVERSE_STEP_MIN);
-                                               
-    ui16_duty_cycle_ramp_down_inverse_step = map((uint32_t) ui16_wheel_speed_x10,
-                                                 (uint32_t) 40, // 40 -> 4 kph
-                                                 (uint32_t) 200, // 200 -> 20 kph
-                                                 (uint32_t) PWM_DUTY_CYCLE_RAMP_DOWN_INVERSE_STEP_DEFAULT,
-                                                 (uint32_t) PWM_DUTY_CYCLE_RAMP_DOWN_INVERSE_STEP_MIN);
-                                                 
-    // set battery current target
-    ui8_adc_battery_current_target = ui8_adc_battery_current_max;
-    
-    // set duty cycle target
-    ui8_duty_cycle_target = ui8_cadence_assist_duty_cycle_target;
-  }
+                                               (uint32_t) PWM_DUTY_CYCLE_RAMP_DOWN_INVERSE_STEP_DEFAULT,
+                                               (uint32_t) PWM_DUTY_CYCLE_RAMP_DOWN_INVERSE_STEP_MIN); 
+
+   // set battery current target
+  if (ui8_field_weakening_state_enabled) {ui16_adc_battery_current_target = ui16_adc_battery_current_target + (ui8_field_weakening_current * ui16_adc_battery_current_target / 100);}
+ 
+  if (ui16_adc_battery_current_target > ui8_adc_battery_current_max) { ui8_adc_battery_current_target = ui8_adc_battery_current_max; }
+  else { ui8_adc_battery_current_target = ui16_adc_battery_current_target; }
+  
+   // set duty cycle target
+  if (ui8_adc_battery_current_target) { ui8_duty_cycle_target = PWM_DUTY_CYCLE_MAX; }
+  else { ui8_duty_cycle_target = 0; }
+  
 }
 
 
@@ -462,29 +498,21 @@ static void apply_emtb_assist()
     
     // get the eMTB assist sensitivity
     uint8_t ui8_eMTB_assist_sensitivity = ui8_riding_mode_parameter;
-    
+
+																									  
+  
     switch (ui8_eMTB_assist_sensitivity)
     {
-      case 1: ui8_adc_battery_current_target_eMTB_assist = ui8_eMTB_power_function_160[ui16_adc_pedal_torque_delta + eMTB_ASSIST_ADC_TORQUE_OFFSET]; break;
-      case 2: ui8_adc_battery_current_target_eMTB_assist = ui8_eMTB_power_function_165[ui16_adc_pedal_torque_delta + eMTB_ASSIST_ADC_TORQUE_OFFSET]; break;
-      case 3: ui8_adc_battery_current_target_eMTB_assist = ui8_eMTB_power_function_170[ui16_adc_pedal_torque_delta + eMTB_ASSIST_ADC_TORQUE_OFFSET]; break;
-      case 4: ui8_adc_battery_current_target_eMTB_assist = ui8_eMTB_power_function_175[ui16_adc_pedal_torque_delta + eMTB_ASSIST_ADC_TORQUE_OFFSET]; break;
-      case 5: ui8_adc_battery_current_target_eMTB_assist = ui8_eMTB_power_function_180[ui16_adc_pedal_torque_delta + eMTB_ASSIST_ADC_TORQUE_OFFSET]; break;
-      case 6: ui8_adc_battery_current_target_eMTB_assist = ui8_eMTB_power_function_185[ui16_adc_pedal_torque_delta + eMTB_ASSIST_ADC_TORQUE_OFFSET]; break;
-      case 7: ui8_adc_battery_current_target_eMTB_assist = ui8_eMTB_power_function_190[ui16_adc_pedal_torque_delta + eMTB_ASSIST_ADC_TORQUE_OFFSET]; break;
-      case 8: ui8_adc_battery_current_target_eMTB_assist = ui8_eMTB_power_function_195[ui16_adc_pedal_torque_delta + eMTB_ASSIST_ADC_TORQUE_OFFSET]; break;
-      case 9: ui8_adc_battery_current_target_eMTB_assist = ui8_eMTB_power_function_200[ui16_adc_pedal_torque_delta + eMTB_ASSIST_ADC_TORQUE_OFFSET]; break;
-      case 10: ui8_adc_battery_current_target_eMTB_assist = ui8_eMTB_power_function_205[ui16_adc_pedal_torque_delta + eMTB_ASSIST_ADC_TORQUE_OFFSET]; break;
-      case 11: ui8_adc_battery_current_target_eMTB_assist = ui8_eMTB_power_function_210[ui16_adc_pedal_torque_delta + eMTB_ASSIST_ADC_TORQUE_OFFSET]; break;
-      case 12: ui8_adc_battery_current_target_eMTB_assist = ui8_eMTB_power_function_215[ui16_adc_pedal_torque_delta + eMTB_ASSIST_ADC_TORQUE_OFFSET]; break;
-      case 13: ui8_adc_battery_current_target_eMTB_assist = ui8_eMTB_power_function_220[ui16_adc_pedal_torque_delta + eMTB_ASSIST_ADC_TORQUE_OFFSET]; break;
-      case 14: ui8_adc_battery_current_target_eMTB_assist = ui8_eMTB_power_function_225[ui16_adc_pedal_torque_delta + eMTB_ASSIST_ADC_TORQUE_OFFSET]; break;
-      case 15: ui8_adc_battery_current_target_eMTB_assist = ui8_eMTB_power_function_230[ui16_adc_pedal_torque_delta + eMTB_ASSIST_ADC_TORQUE_OFFSET]; break;
-      case 16: ui8_adc_battery_current_target_eMTB_assist = ui8_eMTB_power_function_235[ui16_adc_pedal_torque_delta + eMTB_ASSIST_ADC_TORQUE_OFFSET]; break;
-      case 17: ui8_adc_battery_current_target_eMTB_assist = ui8_eMTB_power_function_240[ui16_adc_pedal_torque_delta + eMTB_ASSIST_ADC_TORQUE_OFFSET]; break;
-      case 18: ui8_adc_battery_current_target_eMTB_assist = ui8_eMTB_power_function_245[ui16_adc_pedal_torque_delta + eMTB_ASSIST_ADC_TORQUE_OFFSET]; break;
-      case 19: ui8_adc_battery_current_target_eMTB_assist = ui8_eMTB_power_function_250[ui16_adc_pedal_torque_delta + eMTB_ASSIST_ADC_TORQUE_OFFSET]; break;
-      case 20: ui8_adc_battery_current_target_eMTB_assist = ui8_eMTB_power_function_255[ui16_adc_pedal_torque_delta + eMTB_ASSIST_ADC_TORQUE_OFFSET]; break;
+      case 1: ui8_adc_battery_current_target_eMTB_assist = ui8_eMTB_power_function_160[ui16_adc_pedal_torque_delta]; break;
+      case 2: ui8_adc_battery_current_target_eMTB_assist = ui8_eMTB_power_function_165[ui16_adc_pedal_torque_delta]; break;
+      case 3: ui8_adc_battery_current_target_eMTB_assist = ui8_eMTB_power_function_170[ui16_adc_pedal_torque_delta]; break;
+      case 4: ui8_adc_battery_current_target_eMTB_assist = ui8_eMTB_power_function_175[ui16_adc_pedal_torque_delta]; break;
+      case 5: ui8_adc_battery_current_target_eMTB_assist = ui8_eMTB_power_function_180[ui16_adc_pedal_torque_delta]; break;
+      case 6: ui8_adc_battery_current_target_eMTB_assist = ui8_eMTB_power_function_195[ui16_adc_pedal_torque_delta]; break;
+      case 7: ui8_adc_battery_current_target_eMTB_assist = ui8_eMTB_power_function_210[ui16_adc_pedal_torque_delta]; break;
+      case 8: ui8_adc_battery_current_target_eMTB_assist = ui8_eMTB_power_function_225[ui16_adc_pedal_torque_delta]; break;
+      case 9: ui8_adc_battery_current_target_eMTB_assist = ui8_eMTB_power_function_240[ui16_adc_pedal_torque_delta]; break;
+      case 10: ui8_adc_battery_current_target_eMTB_assist = ui8_eMTB_power_function_255[ui16_adc_pedal_torque_delta]; break;
     }
     
     // set motor acceleration
@@ -501,7 +529,9 @@ static void apply_emtb_assist()
                                                  (uint32_t) PWM_DUTY_CYCLE_RAMP_DOWN_INVERSE_STEP_MIN);
                                                  
     // set battery current target
-    if (ui8_adc_battery_current_target_eMTB_assist > ui8_adc_battery_current_max) { ui8_adc_battery_current_target = ui8_adc_battery_current_max; }
+    if (ui8_field_weakening_state_enabled) {ui8_adc_battery_current_target_eMTB_assist = ui8_adc_battery_current_target_eMTB_assist + (ui8_field_weakening_current * ui8_adc_battery_current_target_eMTB_assist / 100);}
+	
+	if (ui8_adc_battery_current_target_eMTB_assist > ui8_adc_battery_current_max) { ui8_adc_battery_current_target = ui8_adc_battery_current_max; }
     else { ui8_adc_battery_current_target = ui8_adc_battery_current_target_eMTB_assist; }
 
     // set duty cycle target
@@ -542,11 +572,11 @@ static void apply_walk_assist()
 
 static void apply_cruise()
 {
-  #define CRUISE_PID_KP                             12    // 48 volt motor: 12, 36 volt motor: 14
-  #define CRUISE_PID_KI                             0.7   // 48 volt motor: 1, 36 volt motor: 0.7
+  #define CRUISE_PID_KP                             7   // 48 volt motor: 6, 36 volt motor: 7
+  #define CRUISE_PID_KI                             0.5   // 48 volt motor: 0.5, 36 volt motor: 0.35
   #define CRUISE_PID_INTEGRAL_LIMIT                 1000
   #define CRUISE_PID_KD                             0
-  #define CRUISE_DUTY_CYCLE_RAMP_UP_INVERSE_STEP    80
+  #define CRUISE_DUTY_CYCLE_RAMP_UP_INVERSE_STEP    100
   
   if (ui16_wheel_speed_x10 > CRUISE_THRESHOLD_SPEED_X10)
   {
@@ -731,7 +761,6 @@ static void apply_temperature_limiting()
   if (ui8_motor_temperature_min_value_to_limit >= ui8_motor_temperature_max_value_to_limit)
   {
     ui8_adc_battery_current_target = 0;
-    ui8_temperature_current_limiting_value = 0;
   }
   else
   {
@@ -742,12 +771,6 @@ static void apply_temperature_limiting()
                                          (uint32_t) ui8_adc_battery_current_target,
                                          (uint32_t) 0);
                                          
-    // get a value linear to the current limitation, just to show to user
-    ui8_temperature_current_limiting_value = map((uint32_t) ui16_motor_temperature_filtered_x10,
-                                                 (uint32_t) ui8_motor_temperature_min_value_to_limit * 10,
-                                                 (uint32_t) ui8_motor_temperature_max_value_to_limit * 10,
-                                                 (uint32_t) 255,
-                                                 (uint32_t) 0);
   }
 }
 
@@ -773,7 +796,10 @@ static void calc_wheel_speed(void)
   // calc wheel speed in km/h
   if (ui16_wheel_speed_sensor_ticks)
   {
-    float f_wheel_speed_x10 = (float) PWM_CYCLES_SECOND / ui16_wheel_speed_sensor_ticks; // rps
+    //does not work? why??
+   //ui16_wheel_speed_x10  = (uint32_t) (((6844 * m_configuration_variables.ui16_wheel_perimeter) / ui16_wheel_speed_sensor_ticks) / 10); //(19011 * (3600 /(1000*1000)) * 10) = 684.4
+
+	float f_wheel_speed_x10 = (float) PWM_CYCLES_SECOND / ui16_wheel_speed_sensor_ticks; // rps
     ui16_wheel_speed_x10 = f_wheel_speed_x10 * m_configuration_variables.ui16_wheel_perimeter * 0.036; // rps * millimeters per second * ((3600 / (1000 * 1000)) * 10) kms per hour * 10
   }
   else
@@ -809,7 +835,7 @@ static void calc_cadence(void)
       // calculate cadence in RPM and avoid zero division
       if (ui16_cadence_sensor_ticks_temp)
       {
-        ui8_pedal_cadence_RPM = 46875 / ui16_cadence_sensor_ticks_temp;
+        ui8_pedal_cadence_RPM = 56604 / ui16_cadence_sensor_ticks_temp;
       }
       else
       {
@@ -825,11 +851,11 @@ static void calc_cadence(void)
         
         Formula for calculating the cadence in RPM:
         
-        (1) Cadence in RPM = 60 / (ticks * CADENCE_SENSOR_NUMBER_MAGNETS * 0.000064)
+        (1) Cadence in RPM = 60 / (ticks * CADENCE_SENSOR_NUMBER_MAGNETS * 0.000053)
         
-        (2) Cadence in RPM = 60 / (ticks * 0.00128)
+        (2) Cadence in RPM = 60 / (ticks * 0.00106)
         
-        (3) Cadence in RPM = 46875 / ticks
+        (3) Cadence in RPM = 56604 / ticks
         
       -------------------------------------------------------------------------------------------------*/
     
@@ -847,11 +873,11 @@ static void calc_cadence(void)
         // adjust cadence calculation depending on pulse state
         if (ui8_cadence_sensor_pulse_state_temp)
         {
-          ui8_pedal_cadence_RPM = ((uint32_t) (1000 - ui16_cadence_sensor_pulse_high_percentage_x10) * 46875) / ((uint32_t) ui16_cadence_sensor_ticks_temp * 1000);
+          ui8_pedal_cadence_RPM = ((uint32_t) (1000 - ui16_cadence_sensor_pulse_high_percentage_x10) * 56604) / ((uint32_t) ui16_cadence_sensor_ticks_temp * 1000);
         }
         else
         {
-          ui8_pedal_cadence_RPM = ((uint32_t) ui16_cadence_sensor_pulse_high_percentage_x10 * 46875) / ((uint32_t) ui16_cadence_sensor_ticks_temp * 1000);
+          ui8_pedal_cadence_RPM = ((uint32_t) ui16_cadence_sensor_pulse_high_percentage_x10 * 56604) / ((uint32_t) ui16_cadence_sensor_ticks_temp * 1000);
         }
       }
       else
@@ -875,18 +901,18 @@ static void calc_cadence(void)
         Formula for calculating the cadence in RPM using the advanced mode with 
         double the transitions:
         
-        (1) Cadence in RPM = 6000 / (ticks * pulse_duty_cycle * CADENCE_SENSOR_NUMBER_MAGNETS * 0.000064)
+        (1) Cadence in RPM = 6000 / (ticks * pulse_duty_cycle * CADENCE_SENSOR_NUMBER_MAGNETS * 0.000053)
 
-        (2) Cadence in RPM = 6000 / (ticks * pulse_duty_cycle * 0.00128)
+        (2) Cadence in RPM = 6000 / (ticks * pulse_duty_cycle * 0.00106)
         
-        (3) Cadence in RPM = 4687500 / (ticks * pulse_duty_cycle)
+        (3) Cadence in RPM = 5660400 / (ticks * pulse_duty_cycle)
 
 
-        (1) Cadence in RPM * 2 = 60 / (ticks * CADENCE_SENSOR_NUMBER_MAGNETS * 0.000064)
+        (1) Cadence in RPM * 2 = 60 / (ticks * CADENCE_SENSOR_NUMBER_MAGNETS * 0.000053)
         
-        (2) Cadence in RPM * 2 = 60 / (ticks * 0.00128)
+        (2) Cadence in RPM * 2 = 60 / (ticks * 0.00106)
         
-        (3) Cadence in RPM * 2 = 4687500 / ticks
+        (3) Cadence in RPM * 2 = 5660400 / ticks
 
         
       -------------------------------------------------------------------------------------------------*/
@@ -918,6 +944,101 @@ static void get_battery_current_filtered(void)
 
 
 
+static void linearize_torque_sensor_to_kgs(uint16_t *ui16_p_torque_sensor_adc_steps, uint16_t *ui16_torque_sensor_weight_x10)
+{
+  uint16_t ui16_array_sum[TORQUE_SENSOR_LINEARIZE_NR_POINTS];
+  uint8_t ui8_end = 0;
+  uint16_t ui16_p_torque_sensor_adc_absolute_steps;
+
+  memset(ui16_array_sum, 0, sizeof(ui16_array_sum));
+
+  if(*ui16_p_torque_sensor_adc_steps > 1){
+  ui16_p_torque_sensor_adc_absolute_steps = *ui16_p_torque_sensor_adc_steps + ui16_adc_pedal_torque_offset;
+
+  if(ui16_p_torque_sensor_adc_absolute_steps < ui16_torque_sensor_linear_values[2])
+  {
+    ui16_array_sum[0] = *ui16_p_torque_sensor_adc_steps;
+    ui8_end = 1;
+  }
+  else
+  {
+    ui16_array_sum[0] = ui16_torque_sensor_linear_values[2] - ui16_adc_pedal_torque_offset;
+  }
+
+  if(ui8_end == 0)
+  {
+    if(ui16_p_torque_sensor_adc_absolute_steps < ui16_torque_sensor_linear_values[4])
+    {
+      ui16_array_sum[1] = (ui16_p_torque_sensor_adc_absolute_steps - ui16_torque_sensor_linear_values[2]);
+      ui8_end = 1;
+    }
+    else
+    {
+      ui16_array_sum[1] = ui16_torque_sensor_linear_values[4] - ui16_torque_sensor_linear_values[2];
+    }
+  }
+
+  if(ui8_end == 0)
+  {
+    if(ui16_p_torque_sensor_adc_absolute_steps < ui16_torque_sensor_linear_values[6])
+    {
+      ui16_array_sum[2] = (ui16_p_torque_sensor_adc_absolute_steps - ui16_torque_sensor_linear_values[4]);
+      ui8_end = 1;
+    }
+    else
+    {
+      ui16_array_sum[2] = ui16_torque_sensor_linear_values[6] - ui16_torque_sensor_linear_values[4];
+    }
+  }
+
+  if(ui8_end == 0)
+  {
+    if(ui16_p_torque_sensor_adc_absolute_steps < ui16_torque_sensor_linear_values[8])
+    {
+      ui16_array_sum[3] = (ui16_p_torque_sensor_adc_absolute_steps - ui16_torque_sensor_linear_values[6]);
+      ui8_end = 1;
+    }
+    else
+    {
+      ui16_array_sum[3] = ui16_torque_sensor_linear_values[8] - ui16_torque_sensor_linear_values[6];
+    }
+  }
+
+    if(ui8_end == 0)
+  {
+    if(ui16_p_torque_sensor_adc_absolute_steps < ui16_torque_sensor_linear_values[10])
+    {
+      ui16_array_sum[4] = (ui16_p_torque_sensor_adc_absolute_steps - ui16_torque_sensor_linear_values[8]);
+      ui8_end = 1;
+    }
+    else
+    {
+      ui16_array_sum[4] = ui16_torque_sensor_linear_values[10] - ui16_torque_sensor_linear_values[8];
+    }
+  }
+  
+  if(ui8_end == 0)
+  {
+    ui16_array_sum[5] = ui16_p_torque_sensor_adc_absolute_steps - ui16_torque_sensor_linear_values[10];
+  }
+
+  *ui16_torque_sensor_weight_x10 = 
+     (ui16_array_sum[0] * ui16_torque_sensor_linear_values[1] +
+      ui16_array_sum[1] * ui16_torque_sensor_linear_values[3] +
+      ui16_array_sum[2] * ui16_torque_sensor_linear_values[5] +
+      ui16_array_sum[3] * ui16_torque_sensor_linear_values[7] +
+      ui16_array_sum[4] * ui16_torque_sensor_linear_values[9] +
+	  ui16_array_sum[5] * ui16_torque_sensor_linear_values[11]) / 10;
+  }
+  // no torque_sensor_adc_steps
+  else
+  {
+    *ui16_torque_sensor_weight_x10 = 0;
+  }
+}
+
+
+
 static void get_pedal_torque(void)
 {
   // get adc pedal torque
@@ -933,9 +1054,14 @@ static void get_pedal_torque(void)
     ui16_adc_pedal_torque_delta = 0;
   }
   
+  if (ui8_torque_linearization_enabled){
+   // linearize and calculate weight on pedals
+  linearize_torque_sensor_to_kgs(&ui16_adc_pedal_torque_delta, &ui16_m_torque_sensor_weight_x10);
+  ui16_pedal_torque_x100 = ui16_m_torque_sensor_weight_x10 * 17; 
+  }else{
   // calculate torque on pedals
-  ui16_pedal_torque_x100 = ui16_adc_pedal_torque_delta * m_configuration_variables.ui8_pedal_torque_per_10_bit_ADC_step_x100;
-
+  ui16_pedal_torque_x100 = ui16_adc_pedal_torque_delta * m_configuration_variables.ui8_pedal_torque_per_10_bit_ADC_step_x100; // default = 67
+  }
   // calculate human power
   ui16_human_power_x10 = ((uint32_t) ui16_pedal_torque_x100 * ui8_pedal_cadence_RPM) / 96; // see note below
   
@@ -1055,6 +1181,19 @@ static void check_system()
     // reset error code
     ui8_system_state = NO_ERROR;
   }
+  
+    // check tx/rx  communication
+  if (ui8_missed_uart_packets > 50)
+  {
+    // set error code
+    ui8_system_state = ERROR_UART_LOST_COMMUNICATION;
+  }
+  else if (ui8_system_state == ERROR_UART_LOST_COMMUNICATION)
+  {
+    // reset error code
+    ui8_system_state = NO_ERROR;
+  }
+  
 }
 
 
@@ -1318,7 +1457,36 @@ void ebike_control_lights(void)
 // This is the interrupt that happens when UART2 receives data. We need it to be the fastest possible and so
 // we do: receive every byte and assembly as a package, finally, signal that we have a package to process (on main slow loop)
 // and disable the interrupt. The interrupt should be enable again on main loop, after the package being processed
-void UART2_IRQHandler(void) __interrupt(UART2_IRQHANDLER)
+
+void UART2_TX_IRQHandler(void) __interrupt(UART2_TX_IRQHANDLER)
+{
+  if (UART2_GetFlagStatus(UART2_FLAG_TXE) == SET)
+  {
+    if(ui8_tx_buffer_index <= (UART_NUMBER_DATA_BYTES_TO_SEND + 3))  // bytes to send
+    {
+      // clearing the TXE bit is always performed by a write to the data register
+      UART2_SendData8(ui8_tx_buffer[ui8_tx_buffer_index]);
+      ++ui8_tx_buffer_index;
+      if(ui8_tx_buffer_index > (UART_NUMBER_DATA_BYTES_TO_SEND + 3))
+      {
+        // buffer empty
+        // disable TIEN (TXE)
+		ui8_tx_buffer_index = 0;
+        UART2_ITConfig(UART2_IT_TXE, DISABLE);
+      }
+    }
+  }
+  else
+  {
+    // TXE interrupt should never occur if there is nothing to send in the buffer
+    // send a zero to clear TXE and disable the interrupt
+    UART2_SendData8(0);
+    UART2_ITConfig(UART2_IT_TXE, DISABLE);
+  }
+}
+
+
+void UART2_RX_IRQHandler(void) __interrupt(UART2_RX_IRQHANDLER)
 {
   if (UART2_GetFlagStatus(UART2_FLAG_RXNE) == SET)
   {
@@ -1364,16 +1532,21 @@ void UART2_IRQHandler(void) __interrupt(UART2_IRQHANDLER)
   }
 }
 
+
+// sending/receiving values every 120ms
 static void communications_controller (void)
 {
 #ifndef DEBUG_UART
 
-  // reset riding mode (safety)
-  ui8_riding_mode = OFF_MODE;
-  
-  uart_receive_package ();
+  if(comm_s != comm_s){ 
 
+  if (ui8_missed_uart_packets > 4)
+  ui8_riding_mode = OFF_MODE;
+
+  uart_receive_package ();
   uart_send_package ();
+  
+  }
 
 #endif
 }
@@ -1393,79 +1566,84 @@ static void uart_receive_package(void)
     // if CRC is correct read the package (16 bit value and therefore last two bytes)
     if (((((uint16_t) ui8_rx_buffer [UART_NUMBER_DATA_BYTES_TO_RECEIVE + 2]) << 8) + ((uint16_t) ui8_rx_buffer [UART_NUMBER_DATA_BYTES_TO_RECEIVE + 1])) == ui16_crc_rx)
     {
-      // message ID
-      ui8_message_ID = ui8_rx_buffer [1];
-      
+      //packet type
+	  ui8_packet_type = ui8_rx_buffer[1];
+	  // message ID
+      ui8_message_ID = ui8_rx_buffer [2];
       // riding mode
-      ui8_riding_mode = ui8_rx_buffer [2];
-      
+      ui8_riding_mode = ui8_rx_buffer [3];
       // riding mode parameter
-      ui8_riding_mode_parameter = ui8_rx_buffer [3];
-      
-      // lights state
-      ui8_lights_state = ui8_rx_buffer [4];
+      ui8_riding_mode_parameter = ui8_rx_buffer [4];
+      // lights state /torque_linearization/field_weakening
+      uint8_t ui8_temp = ui8_rx_buffer [5];
+	  
+	  ui8_lights_state = ui8_temp & 1;
+	  ui8_torque_linearization_enabled = (ui8_temp & 2) >> 1;
+	  ui8_field_weakening_enabled = (ui8_temp & 4) >> 2;
 
-      switch (ui8_message_ID)
+	  if(ui8_packet_type == UART_PACKET_REGULAR){
+      
+	  switch (ui8_message_ID)
       {
         case 0:
         
           // battery low voltage cut off x10
-          m_configuration_variables.ui16_battery_low_voltage_cut_off_x10 = (((uint16_t) ui8_rx_buffer [6]) << 8) + ((uint16_t) ui8_rx_buffer [5]);
+          m_configuration_variables.ui16_battery_low_voltage_cut_off_x10 = (((uint16_t) ui8_rx_buffer [7]) << 8) + ((uint16_t) ui8_rx_buffer [6]);
           
           // set low voltage cutoff (8 bit)
           ui8_adc_battery_voltage_cut_off = ((uint32_t) m_configuration_variables.ui16_battery_low_voltage_cut_off_x10 * 25) / BATTERY_VOLTAGE_PER_10_BIT_ADC_STEP_X1000;
           
           // wheel max speed
-          m_configuration_variables.ui8_wheel_speed_max = ui8_rx_buffer [7];
+          m_configuration_variables.ui8_wheel_speed_max = ui8_rx_buffer [8];
           
         break;
 
         case 1:
         
           // wheel perimeter
-          m_configuration_variables.ui16_wheel_perimeter = (((uint16_t) ui8_rx_buffer [6]) << 8) + ((uint16_t) ui8_rx_buffer [5]);
+          m_configuration_variables.ui16_wheel_perimeter = (((uint16_t) ui8_rx_buffer [7]) << 8) + ((uint16_t) ui8_rx_buffer [6]);
           
           // motor temperature limit function or throttle
-          m_configuration_variables.ui8_optional_ADC_function = ui8_rx_buffer [7];
+          m_configuration_variables.ui8_optional_ADC_function = ui8_rx_buffer [8];
 
         break;
 
         case 2:
         
           // type of motor (36 volt, 48 volt or some experimental type)
-          m_configuration_variables.ui8_motor_type = ui8_rx_buffer[5];
+          m_configuration_variables.ui8_motor_type = ui8_rx_buffer[6];
           
           // motor over temperature min value limit
-          ui8_motor_temperature_min_value_to_limit = ui8_rx_buffer[6];
+          ui8_motor_temperature_min_value_to_limit = ui8_rx_buffer[7];
           
           // motor over temperature max value limit
-          ui8_motor_temperature_max_value_to_limit = ui8_rx_buffer[7];
+          ui8_motor_temperature_max_value_to_limit = ui8_rx_buffer[8];
 
         break;
 
         case 3:
         
-          // = ui8_rx_buffer[5];
+          ui8_torque_multiply_factor = ui8_rx_buffer[6];
           
-          // = ui8_rx_buffer[6];
+          ui8_cadence_RPM_switch = ui8_rx_buffer[7];
           
-          // = ui8_rx_buffer[7];
+		  ui8_field_weakening_current = ui8_rx_buffer[8];
           
         break;
 
         case 4:
           
           // lights configuration
-          ui8_lights_configuration = ui8_rx_buffer[5];
+          ui8_lights_configuration = ui8_rx_buffer[6];
           
           // assist without pedal rotation threshold
-          ui8_assist_without_pedal_rotation_threshold = ui8_rx_buffer[6];
+          ui8_assist_without_pedal_rotation_threshold = ui8_rx_buffer[7];
           
           // check if assist without pedal rotation threshold is valid (safety)
           if (ui8_assist_without_pedal_rotation_threshold > 100) { ui8_assist_without_pedal_rotation_threshold = 0; }
           
           // motor acceleration adjustment
-          uint8_t ui8_motor_acceleration_adjustment = ui8_rx_buffer[7];
+          uint8_t ui8_motor_acceleration_adjustment = ui8_rx_buffer[8];
           
           // set duty cycle ramp up inverse step
           ui16_duty_cycle_ramp_up_inverse_step_default = map((uint32_t) ui8_motor_acceleration_adjustment,
@@ -1479,13 +1657,13 @@ static void uart_receive_package(void)
         case 5:
         
           // pedal torque conversion
-          m_configuration_variables.ui8_pedal_torque_per_10_bit_ADC_step_x100 = ui8_rx_buffer[5];
+          m_configuration_variables.ui8_pedal_torque_per_10_bit_ADC_step_x100 = ui8_rx_buffer[6];
           
           // max battery current
-          ui8_battery_current_max = ui8_rx_buffer[6];
+          ui8_battery_current_max = ui8_rx_buffer[7];
           
           // battery power limit
-          m_configuration_variables.ui8_target_battery_max_power_div25 = ui8_rx_buffer[7];
+          m_configuration_variables.ui8_target_battery_max_power_div25 = ui8_rx_buffer[8];
           
           // calculate max battery current in ADC steps from the received battery current limit
           uint8_t ui8_adc_battery_current_max_temp_1 = ((uint16_t) ui8_battery_current_max * 100) / BATTERY_CURRENT_PER_10_BIT_ADC_STEP_X100;
@@ -1493,7 +1671,10 @@ static void uart_receive_package(void)
           // calculate max battery current in ADC steps from the received power limit
           uint32_t ui32_battery_current_max_x100 = ((uint32_t) m_configuration_variables.ui8_target_battery_max_power_div25 * 2500000) / ui16_battery_voltage_filtered_x1000;
           uint8_t ui8_adc_battery_current_max_temp_2 = ui32_battery_current_max_x100 / BATTERY_CURRENT_PER_10_BIT_ADC_STEP_X100;
-          
+
+          // hacky way to correct 0 Max Power setting on display
+		  if (m_configuration_variables.ui8_target_battery_max_power_div25 == 0){ui8_adc_battery_current_max_temp_2 = ui8_adc_battery_current_max_temp_1;}
+		  
           // set max battery current
           ui8_adc_battery_current_max = ui8_min(ui8_adc_battery_current_max_temp_1, ui8_adc_battery_current_max_temp_2);
         
@@ -1502,12 +1683,12 @@ static void uart_receive_package(void)
         case 6:
           
           // cadence sensor mode
-          ui8_cadence_sensor_mode = ui8_rx_buffer[5];
+          ui8_cadence_sensor_mode = ui8_rx_buffer[6];
           
           // cadence sensor pulse high percentage
           if (ui8_cadence_sensor_mode == ADVANCED_MODE)
           {
-            ui16_cadence_sensor_pulse_high_percentage_x10 = (((uint16_t) ui8_rx_buffer[7]) << 8) + ((uint16_t) ui8_rx_buffer[6]);
+            ui16_cadence_sensor_pulse_high_percentage_x10 = (((uint16_t) ui8_rx_buffer[8]) << 8) + ((uint16_t) ui8_rx_buffer[7]);
           }
           
           /*-------------------------------------------------------------------------------------------------
@@ -1525,11 +1706,65 @@ static void uart_receive_package(void)
           // nothing, should display error code
         break;
       }
-    }
+	} 
+	
+	  if(ui8_packet_type == UART_PACKET_CONFIG){
+	  
+      switch (ui8_message_ID)
+      {
+        case 0:
+
+		ui16_torque_sensor_linear_values[0] = ui8_rx_buffer [6];
+        ui16_torque_sensor_linear_values[1] = (((uint16_t) ui8_rx_buffer [8]) << 8) + ((uint16_t) ui8_rx_buffer [7]);  
+        
+		break;
+
+        case 1:
+        
+        ui16_torque_sensor_linear_values[2] = (((uint16_t) ui8_rx_buffer [7]) << 8) + ((uint16_t) ui8_rx_buffer [6]);
+		ui16_torque_sensor_linear_values[3] = ui8_rx_buffer [8];
+
+        break;
+
+        case 2:
+		
+        ui16_torque_sensor_linear_values[4] = (((uint16_t) ui8_rx_buffer [7]) << 8) + ((uint16_t) ui8_rx_buffer [6]);
+		ui16_torque_sensor_linear_values[5] = ui8_rx_buffer [8];
+        
+		break;
+
+        case 3:
+        
+        ui16_torque_sensor_linear_values[6] = (((uint16_t) ui8_rx_buffer [7]) << 8) + ((uint16_t) ui8_rx_buffer [6]);
+		ui16_torque_sensor_linear_values[7] = ui8_rx_buffer [8];
+          
+        break;
+
+        case 4:
+          
+        ui16_torque_sensor_linear_values[8] = (((uint16_t) ui8_rx_buffer [7]) << 8) + ((uint16_t) ui8_rx_buffer [6]);
+		ui16_torque_sensor_linear_values[9] = ui8_rx_buffer [8];
+                                                             
+        break;
+
+        case 5:
+        ui16_torque_sensor_linear_values[10] = (((uint16_t) ui8_rx_buffer [7]) << 8) + ((uint16_t) ui8_rx_buffer [6]);
+		ui16_torque_sensor_linear_values[11] = ui8_rx_buffer [8];		
+        break;
+        
+        case 6:
+        break;
+
+        default:
+          // nothing, should display error code
+        break;
+      }
+    }    
+  }
     
     // signal that we processed the full package
     ui8_received_package_flag = 0;
-
+    ui8_missed_uart_packets = 0;
     // enable UART2 receive interrupt as we are now ready to receive a new package
     UART2->CR2 |= (1 << 5);
   }
@@ -1544,7 +1779,7 @@ static void uart_send_package(void)
 
   // battery voltage filtered x1000
   ui16_temp = ui16_battery_voltage_filtered_x1000;
-  ui8_tx_buffer[1] = (uint8_t) (ui16_temp & 0xff);;
+  ui8_tx_buffer[1] = (uint8_t) (ui16_temp & 0xff);
   ui8_tx_buffer[2] = (uint8_t) (ui16_temp >> 8);
   
   // battery current filtered x10
@@ -1555,8 +1790,8 @@ static void uart_send_package(void)
   ui8_tx_buffer[5] = (uint8_t) (ui16_wheel_speed_x10 >> 8);
 
   // brake state
-  ui8_tx_buffer[6] = ui8_brakes_engaged;
-
+  //ui8_tx_buffer[6] = ui8_brakes_engaged;
+  ui8_tx_buffer[6] = ui8_field_weakening_state_enabled;
   // optional ADC channel value
   ui8_tx_buffer[7] = UI8_ADC_THROTTLE;
   
@@ -1572,8 +1807,8 @@ static void uart_send_package(void)
     
     case TEMPERATURE_CONTROL:
     
-      // current limiting mapped from 0 to 255
-      ui8_tx_buffer[8] = ui8_temperature_current_limiting_value;
+      // temperature
+      ui8_tx_buffer[8] = ui16_motor_temperature_filtered_x10 / 10;;
     
     break;
   }
@@ -1587,7 +1822,15 @@ static void uart_send_package(void)
   ui8_tx_buffer[11] = ui8_pedal_cadence_RPM;
 
   // PWM duty_cycle
-  ui8_tx_buffer[12] = ui8_g_duty_cycle;
+  // convert duty-cycle to 0 - 100 %
+  // add field_weakening_angle
+  ui16_temp = (uint16_t) ui8_g_duty_cycle;
+  ui16_temp = (ui16_temp * 100) / PWM_DUTY_CYCLE_MAX;
+  if (ui8_field_weakening_state_enabled)
+  {
+  ui16_temp += (((uint16_t) ui8_field_weakening_angle) * 14) / 10;
+  }
+  ui8_tx_buffer[12] = (uint8_t) ui16_temp;
   
   // motor speed in ERPS
   ui16_temp = ui16_motor_get_motor_speed_erps();
@@ -1601,26 +1844,26 @@ static void uart_send_package(void)
   ui8_tx_buffer[16] = ui8_system_state;
   
   // motor temperature
-  ui8_tx_buffer[17] = ui16_motor_temperature_filtered_x10 / 10;
+  //ui8_tx_buffer[17] = ui16_motor_temperature_filtered_x10 / 10;
   
   // wheel_speed_sensor_tick_counter
-  ui8_tx_buffer[18] = (uint8_t) (ui32_wheel_speed_sensor_ticks_total & 0xff);
-  ui8_tx_buffer[19] = (uint8_t) ((ui32_wheel_speed_sensor_ticks_total >> 8) & 0xff);
-  ui8_tx_buffer[20] = (uint8_t) ((ui32_wheel_speed_sensor_ticks_total >> 16) & 0xff);
+  ui8_tx_buffer[17] = (uint8_t) (ui32_wheel_speed_sensor_ticks_total & 0xff);
+  ui8_tx_buffer[18] = (uint8_t) ((ui32_wheel_speed_sensor_ticks_total >> 8) & 0xff);
+  ui8_tx_buffer[19] = (uint8_t) ((ui32_wheel_speed_sensor_ticks_total >> 16) & 0xff);
 
   // pedal torque x100
   ui16_temp = ui16_pedal_torque_x100;
-  ui8_tx_buffer[21] = (uint8_t) (ui16_temp & 0xff);
-  ui8_tx_buffer[22] = (uint8_t) (ui16_temp >> 8);
+  ui8_tx_buffer[20] = (uint8_t) (ui16_temp & 0xff);
+  ui8_tx_buffer[21] = (uint8_t) (ui16_temp >> 8);
 
-  // human power x10
-  ui8_tx_buffer[23] = (uint8_t) (ui16_human_power_x10 & 0xff);
-  ui8_tx_buffer[24] = (uint8_t) (ui16_human_power_x10 >> 8);
+  // human power x10 calculated on the display side
+  //ui8_tx_buffer[23] = (uint8_t) (ui16_human_power_x10 & 0xff);
+  //ui8_tx_buffer[24] = (uint8_t) (ui16_human_power_x10 >> 8);
   
   // cadence sensor pulse high percentage
   ui16_temp = ui16_cadence_sensor_pulse_high_percentage_x10;
-  ui8_tx_buffer[25] = (uint8_t) (ui16_temp & 0xff);
-  ui8_tx_buffer[26] = (uint8_t) (ui16_temp >> 8);
+  ui8_tx_buffer[22] = (uint8_t) (ui16_temp & 0xff);
+  ui8_tx_buffer[23] = (uint8_t) (ui16_temp >> 8);
 
   // prepare crc of the package
   ui16_crc_tx = 0xffff;
@@ -1632,184 +1875,8 @@ static void uart_send_package(void)
   
   ui8_tx_buffer[UART_NUMBER_DATA_BYTES_TO_SEND + 1] = (uint8_t) (ui16_crc_tx & 0xff);
   ui8_tx_buffer[UART_NUMBER_DATA_BYTES_TO_SEND + 2] = (uint8_t) (ui16_crc_tx >> 8) & 0xff;
-
-  // send the full package to UART
-  for (ui8_i = 0; ui8_i <= UART_NUMBER_DATA_BYTES_TO_SEND + 2; ui8_i++)
-  {
-    putchar (ui8_tx_buffer[ui8_i]);
-  }
-}
-
-
-
-
-
-/* static void apply_boost()
-{
-  ui8_boost_enabled_and_applied = 0;
-  uint8_t ui8_adc_max_battery_current_boost_state = 0;
-
-  // 1.6 = 1 / 0.625 (each adc step for current)
-  // 25 * 1.6 = 40
-  // 40 * 4 = 160
-  if(m_configuration_variables.ui8_startup_motor_power_boost_assist_level > 0)
-  {
-    uint32_t ui32_temp;
-    ui32_temp = (uint32_t) ui16_pedal_torque_x100 * (uint32_t) m_configuration_variables.ui8_startup_motor_power_boost_assist_level;
-    ui32_temp /= 100;
-
-    // 1.6 = 1 / 0.625 (each adc step for current)
-    // 1.6 * 8 = ~13
-    ui32_temp = (ui32_temp * 13000) / ((uint32_t) ui16_battery_voltage_filtered_x1000);
-    ui8_adc_max_battery_current_boost_state = ui32_temp >> 3;
-    ui8_limit_max(&ui8_adc_max_battery_current_boost_state, 255);
-  }
   
-  // apply boost and boost fade out
-  if(m_configuration_variables.ui8_startup_motor_power_boost_feature_enabled)
-  {
-    boost_run_statemachine();
-    ui8_boost_enabled_and_applied = boost(ui8_adc_max_battery_current_boost_state);
-    apply_boost_fade_out();
-  }
+  ui8_missed_uart_packets++;
+  // start transmition
+  UART2_ITConfig(UART2_IT_TXE, ENABLE);
 }
-
-
-static uint8_t boost(uint8_t ui8_max_current_boost_state)
-{
-  uint8_t ui8_boost_enable = ui8_startup_boost_enable && ui8_riding_mode_parameter && ui8_pedal_cadence_RPM > 0 ? 1 : 0;
-
-  if (ui8_boost_enable)
-  {
-    ui8_adc_battery_current_target = ui8_max_current_boost_state;
-  }
-
-  return ui8_boost_enable;
-}
-
-
-static void apply_boost_fade_out()
-{
-  if (ui8_startup_boost_fade_enable)
-  {
-    // here we try to converge to the regular value, ramping down or up step by step
-    uint16_t ui16_adc_battery_target_current_x256 = ((uint16_t) ui8_adc_battery_current_target) << 8;
-    if (ui16_startup_boost_fade_variable_x256 > ui16_adc_battery_target_current_x256)
-    {
-      ui16_startup_boost_fade_variable_x256 -= ui16_startup_boost_fade_variable_step_amount_x256;
-    }
-    else if (ui16_startup_boost_fade_variable_x256 < ui16_adc_battery_target_current_x256)
-    {
-      ui16_startup_boost_fade_variable_x256 += ui16_startup_boost_fade_variable_step_amount_x256;
-    }
-
-    ui8_adc_battery_current_target = (uint8_t) (ui16_startup_boost_fade_variable_x256 >> 8);
-  }
-}
-
-static void boost_run_statemachine(void)
-{
-  #define BOOST_STATE_BOOST_DISABLED        0
-  #define BOOST_STATE_BOOST                 1
-  #define BOOST_STATE_FADE                  2
-  #define BOOST_STATE_BOOST_WAIT_TO_RESTART 3
-  
-  uint8_t ui8_torque_sensor = ui16_adc_pedal_torque_delta;
-
-  if(m_configuration_variables.ui8_startup_motor_power_boost_time > 0)
-  {
-    switch(ui8_m_startup_boost_state_machine)
-    {
-      // ebike is stopped, wait for throttle signal to startup boost
-      case BOOST_STATE_BOOST_DISABLED:
-      
-        if (ui8_torque_sensor > 12 && (ui8_brakes_engaged == 0))
-        {
-          ui8_startup_boost_enable = 1;
-          ui8_startup_boost_timer = m_configuration_variables.ui8_startup_motor_power_boost_time;
-          ui8_m_startup_boost_state_machine = BOOST_STATE_BOOST;
-        }
-        
-      break;
-
-      case BOOST_STATE_BOOST:
-      
-        // braking means reseting
-        if(ui8_brakes_engaged)
-        {
-          ui8_startup_boost_enable = 0;
-          ui8_m_startup_boost_state_machine = BOOST_STATE_BOOST_DISABLED;
-        }
-
-        // end boost if
-        if(ui8_torque_sensor < 12)
-        {
-          ui8_startup_boost_enable = 0;
-          ui8_m_startup_boost_state_machine = BOOST_STATE_BOOST_WAIT_TO_RESTART;
-        }
-
-        // decrement timer
-        if(ui8_startup_boost_timer > 0) { ui8_startup_boost_timer--; }
-
-        // end boost and start fade if
-        if(ui8_startup_boost_timer == 0)
-        {
-          ui8_m_startup_boost_state_machine = BOOST_STATE_FADE;
-          ui8_startup_boost_enable = 0;
-
-          // setup variables for fade
-          ui8_startup_boost_fade_steps = m_configuration_variables.ui8_startup_motor_power_boost_fade_time;
-          ui16_startup_boost_fade_variable_x256 = ((uint16_t) ui8_adc_battery_current_target << 8);
-          ui16_startup_boost_fade_variable_step_amount_x256 = (ui16_startup_boost_fade_variable_x256 / ((uint16_t) ui8_startup_boost_fade_steps));
-          ui8_startup_boost_fade_enable = 1;
-        }
-      break;
-
-      case BOOST_STATE_FADE:
-        // braking means reseting
-        if(ui8_brakes_engaged)
-        {
-          ui8_startup_boost_fade_enable = 0;
-          ui8_startup_boost_fade_steps = 0;
-          ui8_m_startup_boost_state_machine = BOOST_STATE_BOOST_DISABLED;
-        }
-
-        if(ui8_startup_boost_fade_steps > 0) { ui8_startup_boost_fade_steps--; }
-
-        // disable fade if
-        if(ui8_torque_sensor < 12 ||
-            ui8_startup_boost_fade_steps == 0)
-        {
-          ui8_startup_boost_fade_enable = 0;
-          ui8_startup_boost_fade_steps = 0;
-          ui8_m_startup_boost_state_machine = BOOST_STATE_BOOST_WAIT_TO_RESTART;
-        }
-      break;
-
-      // restart when user is not pressing the pedals AND/OR wheel speed = 0
-      case BOOST_STATE_BOOST_WAIT_TO_RESTART:
-        // wheel speed must be 0 as also torque sensor
-        if((m_configuration_variables.ui8_startup_motor_power_boost_state & 1) == 0)
-        {
-          if(ui16_wheel_speed_x10 == 0 &&
-              ui8_torque_sensor < 12)
-          {
-            ui8_m_startup_boost_state_machine = BOOST_STATE_BOOST_DISABLED;
-          }
-        }
-        // torque sensor must be 0
-        if((m_configuration_variables.ui8_startup_motor_power_boost_state & 1) > 0)
-        {
-          if(ui8_torque_sensor < 12 ||
-              ui8_pedal_cadence_RPM == 0)
-          {
-            ui8_m_startup_boost_state_machine = BOOST_STATE_BOOST_DISABLED;
-          }
-        }
-      break;
-
-      default:
-      break;
-    }
-  }
-} */

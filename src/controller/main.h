@@ -15,16 +15,16 @@
 
 
 // motor 
-#define PWM_CYCLES_COUNTER_MAX                                    3125    // 5 erps minimum speed -> 1/5 = 200 ms; 200 ms / 64 us = 3125
-#define PWM_CYCLES_SECOND                                         15625   // 1 / 64us(PWM period)
+#define PWM_CYCLES_COUNTER_MAX                    				  3800    // 5 erps minimum speed; 1/5 = 200ms; 200ms/52.6us = 3800
+#define PWM_CYCLES_SECOND                         				  19011L  // 1 / 52.6us(PWM period)
 #define PWM_DUTY_CYCLE_MAX                                        254
 #define MIDDLE_PWM_DUTY_CYCLE_MAX                                 (PWM_DUTY_CYCLE_MAX / 2)
 
-#define PWM_DUTY_CYCLE_RAMP_UP_INVERSE_STEP_DEFAULT               160     // 160 -> 160 * 64 us for every duty cycle increment
-#define PWM_DUTY_CYCLE_RAMP_UP_INVERSE_STEP_MIN                   20      // 20 -> 20 * 64 us for every duty cycle increment
+#define PWM_DUTY_CYCLE_RAMP_UP_INVERSE_STEP_DEFAULT               200     // 160 -> 160 * 53 us for every duty cycle increment 
+#define PWM_DUTY_CYCLE_RAMP_UP_INVERSE_STEP_MIN                   24      // 20 -> 20 * 53 us for every duty cycle increment 
 
-#define PWM_DUTY_CYCLE_RAMP_DOWN_INVERSE_STEP_DEFAULT             40      // 40 -> 40 * 64 us for every duty cycle decrement
-#define PWM_DUTY_CYCLE_RAMP_DOWN_INVERSE_STEP_MIN                 8       // 8 -> 8 * 64 us for every duty cycle decrement
+#define PWM_DUTY_CYCLE_RAMP_DOWN_INVERSE_STEP_DEFAULT             50      // 40 -> 40 * 53 us for every duty cycle decrement 
+#define PWM_DUTY_CYCLE_RAMP_DOWN_INVERSE_STEP_MIN                 10       // 8 -> 8 * 53 us for every duty cycle decrement
 
 /*---------------------------------------------------------
   NOTE: regarding duty cycle (PWM) ramping
@@ -36,7 +36,10 @@
   low values for acceleration.
 ---------------------------------------------------------*/
 
-
+// The following value were tested by Casainho on 2020.04.23 
+#define FIELD_WEAKENING_RAMP_UP_INVERSE_STEP 					  600
+#define FIELD_WEAKENING_RAMP_DOWN_INVERSE_STEP 					  600
+#define FIELD_WEAKENING_ANGLE_MAX                 				  8 		// 8 * 1.4 = 11 | tested by Casainho on 2020.04.23 and gives up to 125% more motor speed
 
 #define MOTOR_ROTOR_OFFSET_ANGLE                                  10
 #define MOTOR_ROTOR_ANGLE_90                                      (63  + MOTOR_ROTOR_OFFSET_ANGLE)
@@ -56,9 +59,8 @@
 ---------------------------------------------------------*/
 
 
-
-#define MOTOR_OVER_SPEED_ERPS                                     520     // motor max speed, protection max value | 30 points for the sinewave at max speed
-#define MOTOR_OVER_SPEED_ERPS_EXPERIMENTAL                        700     // experimental motor speed to allow a higher cadence
+#define MOTOR_OVER_SPEED_ERPS                     700 // 675 is equal to 120 cadence, as TSDZ2 has a reduciton ratio of 41.8
+#define MOTOR_SPEED_FIELD_WEAKEANING_MIN          500 //  cadence at 90 
 
 #define MOTOR_ROTOR_ERPS_START_INTERPOLATION_60_DEGREES           10
 
@@ -75,6 +77,7 @@
 
 #define ADC_10_BIT_BATTERY_CURRENT_MAX                            106     // 18 amps
 #define ADC_10_BIT_MOTOR_PHASE_CURRENT_MAX                        177     // 30 amps
+
 
 /*---------------------------------------------------------
   NOTE: regarding ADC battery current max
@@ -105,7 +108,7 @@
 #define CADENCE_SENSOR_NUMBER_MAGNETS                             20
 #define CADENCE_SENSOR_NUMBER_MAGNETS_X2                          (CADENCE_SENSOR_NUMBER_MAGNETS * 2)
 
-#define CADENCE_SENSOR_TICKS_COUNTER_MAX                          300
+#define CADENCE_SENSOR_TICKS_COUNTER_MAX                          350
 #define CADENCE_SENSOR_TICKS_COUNTER_MIN                          10000
 
 #define CADENCE_SENSOR_PULSE_PERCENTAGE_X10_DEFAULT               500
@@ -116,13 +119,13 @@
   NOTE: regarding the cadence sensor
   
   CADENCE_SENSOR_NUMBER_MAGNETS = 20, this is the number of magnets used for
-  the cadence sensor. Was validated on August 2018 by Casainho and jbalat
+  the cadence sensor. 
   
-  x = (1/(150RPM/60)) / (0.000064)
+  x = (1/(150RPM/60)) / (0.000053)
   
-  6250 / CADENCE_SENSOR_NUMBER_MAGNETS ≈ 313 -> 150 RPM
+  7625 / CADENCE_SENSOR_NUMBER_MAGNETS ≈ 381 -> 150 RPM 
   
-  93750 / CADENCE_SENSOR_NUMBER_MAGNETS ≈ 4688 -> 10 RPM
+  114375 / CADENCE_SENSOR_NUMBER_MAGNETS ≈ 5718 -> 10 RPM 
   
   CADENCE_SENSOR_TICKS_COUNTER_MAX = x / CADENCE_SENSOR_NUMBER_MAGNETS
   
@@ -131,11 +134,11 @@
   CADENCE_SENSOR_NUMBER_MAGNETS_X2 = 40, this is the number of transitions 
   in one crank revolution
   
-  x = (1/(150RPM/60)) / (0.000064)
+  x = (1/(150RPM/60)) / (0.000053)
   
-  6250 / CADENCE_SENSOR_NUMBER_MAGNETS_X2 ≈ 156 -> 150 RPM
+  7625 / CADENCE_SENSOR_NUMBER_MAGNETS_X2 ≈ 190 -> 150 RPM
   
-  93750 / CADENCE_SENSOR_NUMBER_MAGNETS_X2 ≈ 2344 -> 10 RPM, or 5 RPM if set to around 4600
+  114375 / CADENCE_SENSOR_NUMBER_MAGNETS_X2 ≈ 2859 -> 10 RPM
   
   CADENCE_SENSOR_TICKS_COUNTER_MAX = x / CADENCE_SENSOR_NUMBER_MAGNETS_X2
   
@@ -151,10 +154,8 @@
 
 
 // Wheel speed sensor
-#define WHEEL_SPEED_SENSOR_TICKS_COUNTER_MAX                      135   // something like 200 m/h with a 6'' wheel
-#define WHEEL_SPEED_SENSOR_TICKS_COUNTER_MIN                      32767 // could be a bigger number but will make for a slow detection of stopped wheel speed
-
-
+#define WHEEL_SPEED_SENSOR_TICKS_COUNTER_MAX                      165   // something like 200 m/h with a 6'' wheel
+#define WHEEL_SPEED_SENSOR_TICKS_COUNTER_MIN                      39976 // could be a bigger number but will make for a slow detection of stopped wheel speed
 
 // default values
 #define DEFAULT_VALUE_BATTERY_CURRENT_MAX                         10  // 10 amps
