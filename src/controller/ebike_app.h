@@ -15,6 +15,7 @@
 // cadence sensor
 extern volatile uint8_t ui8_cadence_sensor_mode;
 extern volatile uint16_t ui16_cadence_sensor_ticks_counter_min_speed_adjusted;
+extern volatile uint8_t ui8_assist_without_pedal_rotation_threshold;
 
 typedef struct _configuration_variables
 {

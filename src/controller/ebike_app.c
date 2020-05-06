@@ -30,10 +30,9 @@ static uint8_t    ui8_riding_mode = OFF_MODE;
 static uint8_t    ui8_riding_mode_parameter = 0;
 static uint8_t    ui8_system_state = NO_ERROR;
 static uint8_t    ui8_motor_enabled = 1;
-static uint8_t    ui8_assist_without_pedal_rotation_threshold = 0;
 static uint8_t    ui8_lights_configuration = 10;
 static uint8_t    ui8_lights_state = 0;
-
+volatile uint8_t  ui8_assist_without_pedal_rotation_threshold = 0;
 
 // power control
 static uint8_t    ui8_battery_current_max = DEFAULT_VALUE_BATTERY_CURRENT_MAX;
@@ -89,7 +88,7 @@ static uint8_t ui8_torque_linearization_enabled = 0;
 
 uint16_t ui16_torque_sensor_linear_values[TORQUE_SENSOR_LINEARIZE_NR_POINTS * 2];
 
-/*uint16_t ui16_torque_sensor_linearize[TORQUE_SENSOR_LINEARIZE_NR_POINTS * 2] =
+/*uint16_t ui16_torque_sensor_linear_values[TORQUE_SENSOR_LINEARIZE_NR_POINTS * 2] =
 {
   // ADC 10 bits step, steps_per_kg_x100
   0, 20,
@@ -419,7 +418,7 @@ static void apply_mixmode_assist()
   #define ADC_PEDAL_TORQUE_THRESHOLD            6     // minimum ADC torque to enable torque assist
   #define TORQUE_ASSIST_FACTOR_DENOMINATOR      110   // scale the torque assist target current
     
-	
+  
 	// check for assist without pedal rotation threshold when there is no pedal rotation and standing still
 	if (ui8_assist_without_pedal_rotation_threshold && !ui8_pedal_cadence_RPM && !ui16_wheel_speed_x10)
 	{
@@ -442,7 +441,7 @@ static void apply_mixmode_assist()
   uint16_t ui16_adc_battery_current_target = ui16_battery_current_target_x100 / BATTERY_CURRENT_PER_10_BIT_ADC_STEP_X100;
 
   //apply torque assist if cadence below x
-  if (ui16_adc_pedal_torque_delta && ui8_pedal_cadence_RPM <= ui8_cadence_RPM_switch)
+  if (ui16_adc_pedal_torque_delta && (ui8_pedal_cadence_RPM < ui8_cadence_RPM_switch) && ui8_pedal_cadence_RPM)
   {
 
   if (ui8_torque_linearization_enabled){ui16_adc_pedal_torque_delta = ui16_pedal_torque_x100 / 100;}
@@ -450,8 +449,8 @@ static void apply_mixmode_assist()
     // calculate torque assist target current
   uint16_t ui16_adc_battery_current_target = ((uint16_t) ui16_adc_pedal_torque_delta * ui8_torque_assist_factor) / TORQUE_ASSIST_FACTOR_DENOMINATOR;
 	
-  }  
-   
+  }
+  
    // set motor acceleration
   ui16_duty_cycle_ramp_up_inverse_step = map((uint32_t) ui16_wheel_speed_x10,
                                              (uint32_t) 40, // 40 -> 4 kph
@@ -796,11 +795,10 @@ static void calc_wheel_speed(void)
   // calc wheel speed in km/h
   if (ui16_wheel_speed_sensor_ticks)
   {
-    //does not work? why??
-   //ui16_wheel_speed_x10  = (uint32_t) (((6844 * m_configuration_variables.ui16_wheel_perimeter) / ui16_wheel_speed_sensor_ticks) / 10); //(19011 * (3600 /(1000*1000)) * 10) = 684.4
-
-	float f_wheel_speed_x10 = (float) PWM_CYCLES_SECOND / ui16_wheel_speed_sensor_ticks; // rps
-    ui16_wheel_speed_x10 = f_wheel_speed_x10 * m_configuration_variables.ui16_wheel_perimeter * 0.036; // rps * millimeters per second * ((3600 / (1000 * 1000)) * 10) kms per hour * 10
+    uint32_t temp = (6844L * (long int)m_configuration_variables.ui16_wheel_perimeter) / ui16_wheel_speed_sensor_ticks; //(19011 * (3600 /(1000*1000)) * 10) = 684.4
+    ui16_wheel_speed_x10 = temp / 10;
+	//float f_wheel_speed_x10 = (float) PWM_CYCLES_SECOND / ui16_wheel_speed_sensor_ticks; // rps
+    //ui16_wheel_speed_x10 = f_wheel_speed_x10 * m_configuration_variables.ui16_wheel_perimeter * 0.036; // rps * millimeters per second * ((3600 / (1000 * 1000)) * 10) kms per hour * 10
   }
   else
   {
@@ -952,7 +950,7 @@ static void linearize_torque_sensor_to_kgs(uint16_t *ui16_p_torque_sensor_adc_st
 
   memset(ui16_array_sum, 0, sizeof(ui16_array_sum));
 
-  if(*ui16_p_torque_sensor_adc_steps > 1){
+  if(*ui16_p_torque_sensor_adc_steps > 0){
   ui16_p_torque_sensor_adc_absolute_steps = *ui16_p_torque_sensor_adc_steps + ui16_adc_pedal_torque_offset;
 
   if(ui16_p_torque_sensor_adc_absolute_steps < ui16_torque_sensor_linear_values[2])
@@ -1054,7 +1052,7 @@ static void get_pedal_torque(void)
     ui16_adc_pedal_torque_delta = 0;
   }
   
-  if (ui8_torque_linearization_enabled){
+  if ((ui8_torque_linearization_enabled) && (ui8_packet_type == UART_PACKET_REGULAR)){
    // linearize and calculate weight on pedals
   linearize_torque_sensor_to_kgs(&ui16_adc_pedal_torque_delta, &ui16_m_torque_sensor_weight_x10);
   ui16_pedal_torque_x100 = ui16_m_torque_sensor_weight_x10 * 17; 
@@ -1537,8 +1535,8 @@ void UART2_RX_IRQHandler(void) __interrupt(UART2_RX_IRQHANDLER)
 static void communications_controller (void)
 {
 #ifndef DEBUG_UART
-
-  if(comm_s != comm_s){ 
+ 
+  if(comm_s = !comm_s){ 
 
   if (ui8_missed_uart_packets > 4)
   ui8_riding_mode = OFF_MODE;

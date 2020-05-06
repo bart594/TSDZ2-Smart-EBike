@@ -387,6 +387,7 @@ volatile uint8_t ui8_cadence_sensor_pulse_state = 0;
 volatile uint8_t ui8_cadence_sensor_stop_flag = 0;
 volatile uint16_t ui16_cadence_sensor_ticks_stop = 0;
 volatile uint8_t ui8_fix_overrun_enabled = 1;
+volatile uint8_t ui8_cadence_sensor_start_counter = 0;
 
 // wheel speed sensor
 volatile uint16_t ui16_wheel_speed_sensor_ticks = 0;
@@ -701,9 +702,10 @@ void TIM1_CAP_COM_IRQHandler(void) __interrupt(TIM1_CAP_COM_IRQHANDLER)
           {
             --ui8_field_weakening_angle;
           }
-          else
+          else if (++ui16_counter_duty_cycle_ramp_down > ui16_controller_duty_cycle_ramp_down_inverse_step)
           {
-            --ui8_g_duty_cycle; // exit from field weakening state
+              ui16_counter_duty_cycle_ramp_down = 0;
+			--ui8_g_duty_cycle; // exit from field weakening state
           }
         }
       }
@@ -813,6 +815,7 @@ void TIM1_CAP_COM_IRQHandler(void) __interrupt(TIM1_CAP_COM_IRQHANDLER)
   /****************************************************************************/
   
   
+  #define CADENCE_SENSOR_START_THRESHOLD				20
   
   static uint16_t ui16_cadence_sensor_ticks_counter;
   static uint16_t ui16_cadence_sensor_ticks_counter_min;
@@ -828,6 +831,10 @@ void TIM1_CAP_COM_IRQHandler(void) __interrupt(TIM1_CAP_COM_IRQHANDLER)
   {
     // update old cadence sensor pin state
     ui8_cadence_sensor_pin_state_old = ui8_cadence_sensor_pin_1_state;
+	
+	// delay for disable overrun at pedal start
+	if(ui8_cadence_sensor_start_counter <= CADENCE_SENSOR_START_THRESHOLD)
+		ui8_cadence_sensor_start_counter++;
     
     // select cadence sensor mode
     switch (ui8_cadence_sensor_mode)
@@ -976,17 +983,29 @@ void TIM1_CAP_COM_IRQHandler(void) __interrupt(TIM1_CAP_COM_IRQHANDLER)
   // for overrun problem
   if(ui8_fix_overrun_enabled)
   {
-	if(ui16_cadence_sensor_ticks)
+	// disable overrun at pedal start
+	if((ui8_assist_without_pedal_rotation_threshold == 0)||(ui8_cadence_sensor_start_counter >= CADENCE_SENSOR_START_THRESHOLD))
 	{
-		if(ui16_cadence_sensor_ticks_counter > ui16_cadence_sensor_ticks_stop)
-			ui8_cadence_sensor_stop_flag = 1;
+		if(ui16_cadence_sensor_ticks)
+		{
+			if(ui16_cadence_sensor_ticks_counter > ui16_cadence_sensor_ticks_stop)
+				ui8_cadence_sensor_stop_flag = 1;
+			else
+				ui8_cadence_sensor_stop_flag = 0;
+		}
 		else
-			ui8_cadence_sensor_stop_flag = 0;
+		{
+		ui8_cadence_sensor_stop_flag = 1;
+		}
 	}
 	else
 	{
-		ui8_cadence_sensor_stop_flag = 1;
+		ui8_cadence_sensor_stop_flag = 0;
 	}
+	
+	// restart counter for overrun disabled at pedal start
+	if(!ui8_cadence_sensor_ticks_counter_started)
+		ui8_cadence_sensor_start_counter = 0;
   }
   else
   {
