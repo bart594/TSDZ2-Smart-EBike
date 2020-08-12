@@ -23,341 +23,31 @@
 #include "common.h"
 
 #define SVM_TABLE_LEN   256
-#define SIN_TABLE_LEN   60
+#define SIN_TABLE_LEN   59
 
-uint8_t ui8_svm_table[SVM_TABLE_LEN] =
-{
-    239 ,
-    241 ,
-    242 ,
-    243 ,
-    245 ,
-    246 ,
-    247 ,
-    248 ,
-    249 ,
-    250 ,
-    251 ,
-    251 ,
-    252 ,
-    253 ,
-    253 ,
-    254 ,
-    254 ,
-    254 ,
-    255 ,
-    255 ,
-    255 ,
-    255 ,
-    255 ,
-    255 ,
-    254 ,
-    254 ,
-    254 ,
-    253 ,
-    253 ,
-    252 ,
-    251 ,
-    250 ,
-    250 ,
-    249 ,
-    248 ,
-    247 ,
-    245 ,
-    244 ,
-    243 ,
-    242 ,
-    240 ,
-    239 ,
-    236 ,
-    231 ,
-    227 ,
-    222 ,
-    217 ,
-    212 ,
-    207 ,
-    202 ,
-    197 ,
-    191 ,
-    186 ,
-    181 ,
-    176 ,
-    170 ,
-    165 ,
-    160 ,
-    154 ,
-    149 ,
-    144 ,
-    138 ,
-    133 ,
-    127 ,
-    122 ,
-    116 ,
-    111 ,
-    106 ,
-    100 ,
-    95  ,
-    89  ,
-    84  ,
-    79  ,
-    74  ,
-    68  ,
-    63  ,
-    58  ,
-    53  ,
-    48  ,
-    43  ,
-    38  ,
-    33  ,
-    28  ,
-    23  ,
-    18  ,
-    16  ,
-    14  ,
-    13  ,
-    12  ,
-    10  ,
-    9 ,
-    8 ,
-    7 ,
-    6 ,
-    5 ,
-    4 ,
-    3 ,
-    3 ,
-    2 ,
-    1 ,
-    1 ,
-    1 ,
-    0 ,
-    0 ,
-    0 ,
-    0 ,
-    0 ,
-    0 ,
-    0 ,
-    0 ,
-    0 ,
-    1 ,
-    1 ,
-    2 ,
-    2 ,
-    3 ,
-    4 ,
-    5 ,
-    6 ,
-    6 ,
-    8 ,
-    9 ,
-    10  ,
-    11  ,
-    12  ,
-    14  ,
-    15  ,
-    17  ,
-    15  ,
-    14  ,
-    12  ,
-    11  ,
-    10  ,
-    9 ,
-    8 ,
-    6 ,
-    6 ,
-    5 ,
-    4 ,
-    3 ,
-    2 ,
-    2 ,
-    1 ,
-    1 ,
-    0 ,
-    0 ,
-    0 ,
-    0 ,
-    0 ,
-    0 ,
-    0 ,
-    0 ,
-    0 ,
-    1 ,
-    1 ,
-    1 ,
-    2 ,
-    3 ,
-    3 ,
-    4 ,
-    5 ,
-    6 ,
-    7 ,
-    8 ,
-    9 ,
-    10  ,
-    12  ,
-    13  ,
-    14  ,
-    16  ,
-    18  ,
-    23  ,
-    28  ,
-    33  ,
-    38  ,
-    43  ,
-    48  ,
-    53  ,
-    58  ,
-    63  ,
-    68  ,
-    74  ,
-    79  ,
-    84  ,
-    89  ,
-    95  ,
-    100 ,
-    106 ,
-    111 ,
-    116 ,
-    122 ,
-    127 ,
-    133 ,
-    138 ,
-    144 ,
-    149 ,
-    154 ,
-    160 ,
-    165 ,
-    170 ,
-    176 ,
-    181 ,
-    186 ,
-    191 ,
-    197 ,
-    202 ,
-    207 ,
-    212 ,
-    217 ,
-    222 ,
-    227 ,
-    231 ,
-    236 ,
-    239 ,
-    240 ,
-    242 ,
-    243 ,
-    244 ,
-    245 ,
-    247 ,
-    248 ,
-    249 ,
-    250 ,
-    250 ,
-    251 ,
-    252 ,
-    253 ,
-    253 ,
-    254 ,
-    254 ,
-    254 ,
-    255 ,
-    255 ,
-    255 ,
-    255 ,
-    255 ,
-    255 ,
-    254 ,
-    254 ,
-    254 ,
-    253 ,
-    253 ,
-    252 ,
-    251 ,
-    251 ,
-    250 ,
-    249 ,
-    248 ,
-    247 ,
-    246 ,
-    245 ,
-    243 ,
-    242 ,
-    241 ,
-    239 ,
-    238 ,
-};
+uint8_t ui8_svm_table[SVM_TABLE_LEN] = { 239, 241, 242, 243, 245, 246, 247, 248, 249, 250, 251, 251, 252, 253, 253, 254,
+        254, 254, 255, 255, 255, 255, 255, 255, 254, 254, 254, 253, 253, 252, 251, 250, 250, 249, 248, 247, 245, 244,
+        243, 242, 240, 239, 236, 231, 227, 222, 217, 212, 207, 202, 197, 191, 186, 181, 176, 170, 165, 160, 154, 149,
+        144, 138, 133, 127, 122, 116, 111, 106, 100, 95, 89, 84, 79, 74, 68, 63, 58, 53, 48, 43, 38, 33, 28, 23, 18, 16,
+        14, 13, 12, 10, 9, 8, 7, 6, 5, 4, 3, 3, 2, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 2, 2, 3, 4, 5, 6, 6, 8, 9,
+        10, 11, 12, 14, 15, 17, 15, 14, 12, 11, 10, 9, 8, 6, 6, 5, 4, 3, 2, 2, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1,
+        2, 3, 3, 4, 5, 6, 7, 8, 9, 10, 12, 13, 14, 16, 18, 23, 28, 33, 38, 43, 48, 53, 58, 63, 68, 74, 79, 84, 89, 95,
+        100, 106, 111, 116, 122, 127, 133, 138, 144, 149, 154, 160, 165, 170, 176, 181, 186, 191, 197, 202, 207, 212,
+        217, 222, 227, 231, 236, 239, 240, 242, 243, 244, 245, 247, 248, 249, 250, 250, 251, 252, 253, 253, 254, 254,
+        254, 255, 255, 255, 255, 255, 255, 254, 254, 254, 253, 253, 252, 251, 251, 250, 249, 248, 247, 246, 245, 243,
+        242, 241, 239, 238 };
 
-uint8_t ui8_sin_table[SIN_TABLE_LEN] =
-{
-    0 ,
-    3 ,
-    6 ,
-    9 ,
-    12  ,
-    16  ,
-    19  ,
-    22  ,
-    25  ,
-    28  ,
-    31  ,
-    34  ,
-    37  ,
-    40  ,
-    43  ,
-    46  ,
-    49  ,
-    52  ,
-    54  ,
-    57  ,
-    60  ,
-    63  ,
-    66  ,
-    68  ,
-    71  ,
-    73  ,
-    76  ,
-    78  ,
-    81  ,
-    83  ,
-    86  ,
-    88  ,
-    90  ,
-    92  ,
-    95  ,
-    97  ,
-    99  ,
-    101 ,
-    102 ,
-    104 ,
-    106 ,
-    108 ,
-    109 ,
-    111 ,
-    113 ,
-    114 ,
-    115 ,
-    117 ,
-    118 ,
-    119 ,
-    120 ,
-    121 ,
-    122 ,
-    123 ,
-    124 ,
-    125 ,
-    125 ,
-    126 ,
-    126 ,
-    127
-};
+uint8_t ui8_sin_table[SIN_TABLE_LEN] = { 3, 6, 9, 12, 16, 19, 22, 25, 28, 31, 34, 37, 40, 43, 46, 49, 52, 54, 57, 60,
+        63, 66, 68, 71, 73, 76, 78, 81, 83, 86, 88, 90, 92, 95, 97, 99, 101, 102, 104, 106, 108, 109, 111, 113, 114,
+        115, 117, 118, 119, 120, 121, 122, 123, 124, 125, 125, 126, 126, 127 };
 
 uint16_t ui16_PWM_cycles_counter = 1;
 uint16_t ui16_PWM_cycles_counter_6 = 1;
 uint16_t ui16_PWM_cycles_counter_total = 0xffff;
 uint16_t ui16_max_motor_speed_erps = MOTOR_OVER_SPEED_ERPS;
-static volatile uint16_t ui16_motor_speed_erps = 0;
 uint8_t ui8_motor_commutation_type = BLOCK_COMMUTATION;
-uint8_t ui8_hall_sensors_state = 0;
 uint8_t ui8_half_erps_flag = 0;
-
+volatile uint16_t ui16_motor_speed_erps = 0;
 
 // power variables
 volatile uint16_t ui16_controller_duty_cycle_ramp_up_inverse_step = PWM_DUTY_CYCLE_RAMP_UP_INVERSE_STEP_DEFAULT;
@@ -378,16 +68,20 @@ volatile uint8_t ui8_brake_state = 0;
 
 
 // cadence sensor
+#define NO_PAS_REF 5
 volatile uint16_t ui16_cadence_sensor_ticks = 0;
-volatile uint16_t ui16_cadence_sensor_ticks_counter_min_high = CADENCE_SENSOR_TICKS_COUNTER_MIN;
-volatile uint16_t ui16_cadence_sensor_ticks_counter_min_low = CADENCE_SENSOR_TICKS_COUNTER_MIN;
-volatile uint8_t ui8_cadence_sensor_pulse_state = 0;
+volatile uint32_t ui32_crank_revolutions_x20 = 0;
+static uint16_t ui16_cadence_sensor_ticks_counter_min = CADENCE_SENSOR_CALC_COUNTER_MIN;
 
-// for overrun problem 
-volatile uint8_t ui8_cadence_sensor_stop_flag = 0;
+static uint8_t ui8_pas_state_old = 4;
+static uint16_t ui16_cadence_calc_counter, ui16_cadence_stop_counter;
+static uint8_t ui8_cadence_calc_ref_state = NO_PAS_REF;
+static uint8_t ui8_pas_old_valid_state[4] = {0x01,0x03,0x00,0x02};
+
+// for overrun problem
+volatile uint8_t ui8_cadence_sensor_stop_flag = 0; 
 volatile uint16_t ui16_cadence_sensor_ticks_stop = 0;
 volatile uint8_t ui8_fix_overrun_enabled = 1;
-volatile uint8_t ui8_cadence_sensor_start_counter = 0;
 
 // wheel speed sensor
 volatile uint16_t ui16_wheel_speed_sensor_ticks = 0;
@@ -423,43 +117,27 @@ void motor_controller(void)
 // runs every 64us (PWM frequency)
 void TIM1_CAP_COM_IRQHandler(void) __interrupt(TIM1_CAP_COM_IRQHANDLER)
 {
-  static uint8_t ui8_motor_rotor_absolute_angle;
-  static uint8_t ui8_svm_table_index;
-  static uint8_t ui8_adc_motor_phase_current;
-  
-  
-
-  /****************************************************************************/
-  
-  
-  
-  // read battery current ADC value | should happen at middle of the PWM duty_cycle
-  ADC1->CR2 &= (uint8_t)(~ADC1_CR2_SCAN);   // disable scan mode
-  ADC1->CSR = 0x05;                         // clear EOC flag first (select channel 5)
-  ADC1->CR1 |= ADC1_CR1_ADON;               // start ADC1 conversion
-  while (!(ADC1->CSR & ADC1_FLAG_EOC));     // wait for end of conversion
-  
-  ui8_controller_adc_battery_current = ui16_adc_battery_current = UI16_ADC_10_BIT_BATTERY_CURRENT;
-  
-  // calculate motor phase current ADC value
-  if (ui8_g_duty_cycle > 0)
-  {
-    ui8_adc_motor_phase_current = (ui16_adc_battery_current << 6) / ui8_g_duty_cycle;
-  }
-  else
-  {
-    ui8_adc_motor_phase_current = 0;
-  }
+    static uint8_t ui8_motor_rotor_absolute_angle;
+    static uint8_t ui8_svm_table_index;
+    static uint8_t ui8_adc_motor_phase_current;
+    uint8_t ui8_phase_a_voltage;
+    uint8_t ui8_phase_b_voltage;
+    uint8_t ui8_phase_c_voltage;
+    uint8_t ui8_temp;
+    uint16_t ui16_value;
 
 
-  /****************************************************************************/
-  
-  
-  // trigger ADC conversion of all channels (scan conversion, buffered)
-  ADC1->CR2 |= ADC1_CR2_SCAN;     // enable scan mode
-  ADC1->CSR = 0x07;               // clear EOC flag first (select channel 7)
-  ADC1->CR1 |= ADC1_CR1_ADON;     // start ADC1 conversion
+    /****************************************************************************/
 
+    // read battery current ADC value | should happen at middle of the PWM duty_cycle
+    ADC1->CR2 &= (uint8_t)(~ADC1_CR2_SCAN);  // disable scan mode
+    ADC1->CSR = 0x05;                        // clear EOC flag first (select channel 5)
+    ADC1->CR1 |= ADC1_CR1_ADON;              // start ADC1 conversion
+
+    /*
+     * Note: To avoid some wasted time, the end of conversion wait loop is moved
+     * just before the first use of the converted value
+     */
 
   /****************************************************************************/
   
@@ -470,6 +148,7 @@ void TIM1_CAP_COM_IRQHandler(void) __interrupt(TIM1_CAP_COM_IRQHANDLER)
   // - check so that motor is not rotating backwards, if it does, set ERPS to 0
   
   static uint8_t ui8_hall_sensors_state_last;
+  uint8_t ui8_hall_sensors_state;
   
   // read hall sensors signal pins and mask other pins
   // hall sensors sequence with motor forward rotation: 4, 6, 2, 3, 1, 5
@@ -574,6 +253,40 @@ void TIM1_CAP_COM_IRQHandler(void) __interrupt(TIM1_CAP_COM_IRQHANDLER)
     ui8_hall_sensors_state_last = 0; // this way we force execution of hall sensors code next time
   }
 
+    /* Read battery current */
+    // wait for end of conversion
+    while (!(ADC1->CSR & ADC1_FLAG_EOC));
+
+    // Single conversion: do not use bufferd value !
+    // Left alignment: Read MSB first then read LSB !
+    /*
+    ui8_controller_adc_battery_current = ADC1->DRH << 2;
+    ui8_controller_adc_battery_current |= (ADC1->DRL & 0x03);
+    */
+    __asm
+        mov _ui8_controller_adc_battery_current, 0x5404
+        sll _ui8_controller_adc_battery_current+0
+        sll _ui8_controller_adc_battery_current+0
+        ld  a, 0x5405
+        and a, #0x03
+        or a, _ui8_controller_adc_battery_current
+        ld  _ui8_controller_adc_battery_current+0, a
+        ld  _ui16_adc_battery_current+1, a
+        clr _ui16_adc_battery_current+0
+    __endasm;
+
+
+    // trigger ADC conversion of all channels (scan conversion, buffered)
+    ADC1->CR2 |= ADC1_CR2_SCAN;     // enable scan mode
+    ADC1->CSR = 0x07;               // clear EOC flag first (select channel 7)
+    ADC1->CR1 |= ADC1_CR1_ADON;     // start ADC1 conversion
+
+    // calculate motor phase current ADC value
+    if (ui8_g_duty_cycle > 0)
+        ui8_adc_motor_phase_current = (ui16_adc_battery_current << 6) / ui8_g_duty_cycle;
+    else
+        ui8_adc_motor_phase_current = 0;
+ 
 
   /****************************************************************************/
   
@@ -604,7 +317,7 @@ void TIM1_CAP_COM_IRQHandler(void) __interrupt(TIM1_CAP_COM_IRQHANDLER)
 
   
   /****************************************************************************/
-  
+ 
   
   // brakes (consider in slower loop)
   // - check if brakes are installed and enabled
@@ -666,10 +379,10 @@ void TIM1_CAP_COM_IRQHandler(void) __interrupt(TIM1_CAP_COM_IRQHANDLER)
     {
       --ui8_field_weakening_angle;
     }
-	
+
     // for overrun problem
-    if((ui8_cadence_sensor_stop_flag) || (ui8_brake_state))
-      ui16_controller_duty_cycle_ramp_down_inverse_step = PWM_DUTY_CYCLE_RAMP_DOWN_INVERSE_STEP_MIN;
+	if((ui8_cadence_sensor_stop_flag) || (ui8_brake_state))
+		ui16_controller_duty_cycle_ramp_down_inverse_step = PWM_DUTY_CYCLE_RAMP_DOWN_INVERSE_STEP_MIN;	
 	
     // ramp down duty cycle
     if (++ui16_counter_duty_cycle_ramp_down > ui16_controller_duty_cycle_ramp_down_inverse_step)
@@ -702,9 +415,8 @@ void TIM1_CAP_COM_IRQHandler(void) __interrupt(TIM1_CAP_COM_IRQHANDLER)
           {
             --ui8_field_weakening_angle;
           }
-          else if (++ui16_counter_duty_cycle_ramp_down > ui16_controller_duty_cycle_ramp_down_inverse_step)
+          else 
           {
-              ui16_counter_duty_cycle_ramp_down = 0;
 			--ui8_g_duty_cycle; // exit from field weakening state
           }
         }
@@ -734,7 +446,7 @@ void TIM1_CAP_COM_IRQHandler(void) __interrupt(TIM1_CAP_COM_IRQHANDLER)
     ui8_svm_table_index += ui8_field_weakening_angle;
 
   // disable field weakening only after leaving the field weakening state
-  if (ui8_field_weakening_enabled == 1 &&
+  if (ui8_field_weakening_enabled &&
       ui8_g_duty_cycle < PWM_DUTY_CYCLE_MAX)
       ui8_field_weakening_state_enabled = 0;
 
@@ -746,12 +458,6 @@ void TIM1_CAP_COM_IRQHandler(void) __interrupt(TIM1_CAP_COM_IRQHANDLER)
 
   
   // calculate final PWM duty_cycle values to be applied to TIMER1
-  
-  uint8_t ui8_phase_a_voltage;
-  uint8_t ui8_phase_b_voltage;
-  uint8_t ui8_phase_c_voltage;
-  uint8_t ui8_temp;
-  uint16_t ui16_value;
   
   // scale and apply PWM duty_cycle for the 3 phases
   // phase A is advanced 240 degrees over phase B
@@ -813,227 +519,115 @@ void TIM1_CAP_COM_IRQHandler(void) __interrupt(TIM1_CAP_COM_IRQHANDLER)
   
   
   /****************************************************************************/
-  
-  
-  #define CADENCE_SENSOR_START_THRESHOLD				20
-  
-  static uint16_t ui16_cadence_sensor_ticks_counter;
-  static uint16_t ui16_cadence_sensor_ticks_counter_min;
-  static uint8_t ui8_cadence_sensor_ticks_counter_started;
-  static uint8_t ui8_cadence_sensor_pin_state_old;
-  
-  // check cadence sensor pins state
-  volatile uint8_t ui8_cadence_sensor_pin_1_state = PAS2__PORT->IDR & PAS2__PIN; // PAS2__PIN is leading
-  volatile uint8_t ui8_cadence_sensor_pin_2_state = PAS1__PORT->IDR & PAS1__PIN; // PAS1__PIN is following
-  
-  // check if cadence sensor pin state has changed
-  if (ui8_cadence_sensor_pin_1_state != ui8_cadence_sensor_pin_state_old)
-  {
-    // update old cadence sensor pin state
-    ui8_cadence_sensor_pin_state_old = ui8_cadence_sensor_pin_1_state;
-	
-	// delay for disable overrun at pedal start
-	if(ui8_cadence_sensor_start_counter <= CADENCE_SENSOR_START_THRESHOLD)
-		ui8_cadence_sensor_start_counter++;
-    
-    // select cadence sensor mode
-    switch (ui8_cadence_sensor_mode)
-    {
-      case STANDARD_MODE:
-      
-        #define CADENCE_SENSOR_STANDARD_MODE_SCHMITT_TRIGGER_THRESHOLD    1000 // software based Schmitt trigger to stop motor jitter when at resolution limits
-      
-        // only consider the 0 -> 1 transition
-        if (ui8_cadence_sensor_pin_1_state)
-        {
-          // set the ticks counter limit depending on current wheel speed
-          ui16_cadence_sensor_ticks_counter_min = ui16_cadence_sensor_ticks_counter_min_speed_adjusted;
-          
-          // check if first transition
-          if (!ui8_cadence_sensor_ticks_counter_started) 
-          {
-            // start cadence sensor ticks counter as this is the first transition
-            ui8_cadence_sensor_ticks_counter_started = 1;
-          }
-          else
-          {
-            // check if cadence sensor ticks counter is out of bounds and also check direction of rotation
-            if ((ui16_cadence_sensor_ticks_counter < CADENCE_SENSOR_TICKS_COUNTER_MAX) || 
-                (ui8_cadence_sensor_pin_2_state != 0))
-            {
-              // reset variables
-              ui16_cadence_sensor_ticks = 0;
-              ui16_cadence_sensor_ticks_counter = 0;
-              ui8_cadence_sensor_ticks_counter_started = 0;
-            }
-            else
-            {
-              // set the cadence sensor ticks between the two transitions
-              ui16_cadence_sensor_ticks = ui16_cadence_sensor_ticks_counter;
-			  
-              // for overrun problem
-              ui16_cadence_sensor_ticks_stop = (ui16_cadence_sensor_ticks + (ui16_cadence_sensor_ticks >> 3));
 
-              // reset ticks counter
-              ui16_cadence_sensor_ticks_counter = 0;
-              
-              // software based Schmitt trigger to stop motor jitter when at resolution limits
-              ui16_cadence_sensor_ticks_counter_min += CADENCE_SENSOR_STANDARD_MODE_SCHMITT_TRIGGER_THRESHOLD;
-            }
-          }
-        }
-        
-      break;
-      
-      case ADVANCED_MODE:
-        
-        #define CADENCE_SENSOR_ADVANCED_MODE_TICKS_COUNTER_MAX            150   // CADENCE_SENSOR_TICKS_COUNTER_MAX / 2
-        #define CADENCE_SENSOR_ADVANCED_MODE_SCHMITT_TRIGGER_THRESHOLD    500   // software based Schmitt trigger to stop motor jitter when at resolution limits
-        
-        // set the ticks counter limit depending on current wheel speed and pin state
-        if (ui8_cadence_sensor_pin_1_state) { ui16_cadence_sensor_ticks_counter_min = ui16_cadence_sensor_ticks_counter_min_high; }
-        else { ui16_cadence_sensor_ticks_counter_min = ui16_cadence_sensor_ticks_counter_min_low; }
-        
-        // check if first transition
-        if (!ui8_cadence_sensor_ticks_counter_started)
-        {
-          // start cadence sensor ticks counter as this is the first transition
-          ui8_cadence_sensor_ticks_counter_started = 1;
-        }
-        else
-        {
-          // check if cadence sensor ticks counter is out of bounds and also check direction of rotation
-          if ((ui16_cadence_sensor_ticks_counter < CADENCE_SENSOR_ADVANCED_MODE_TICKS_COUNTER_MAX) || 
-              (ui8_cadence_sensor_pin_1_state == ui8_cadence_sensor_pin_2_state))
-          {
-            // reset variables
-            ui16_cadence_sensor_ticks = 0;
-            ui16_cadence_sensor_ticks_counter = 0;
-            ui8_cadence_sensor_ticks_counter_started = 0;
-          }
-          else
-          {
-            // set the cadence sensor ticks between the two transitions
-            ui16_cadence_sensor_ticks = ui16_cadence_sensor_ticks_counter;
-            
-            // set the pulse state
-            ui8_cadence_sensor_pulse_state = ui8_cadence_sensor_pin_1_state;
+
+	/*
+	* - New pedal start/stop detection Algorithm (by MSpider65) -
+	*
+	* Pedal start/stop detection uses both transitions of both PAS sensors
+	* ui8_pas_state stores the PAS1 and PAS2 state: bit0=PAS1,  bit1=PAS2
+	* Pedal forward ui8_pas_state sequence is: 0x01 -> 0x00 -> 0x02 -> 0x03 -> 0x01
+	* After a stop, the first forward transition is taken as reference transition
+	* Following forward transition sets the cadence to 7RPM for immediate startup
+	* Then, starting form the second reference transition, the cadence is calculated based on counter value
+    * All transitions resets the stop detection counter (much faster stop detection):
+	*/
+
+
+	uint8_t ui8_pas_state = (PAS1__PORT->IDR & PAS1__PIN) | ((PAS2__PORT->IDR & PAS2__PIN) >> 6);
+
+	if (ui8_pas_state != ui8_pas_state_old) {
+		if (ui8_pas_state_old != ui8_pas_old_valid_state[ui8_pas_state]) {
+			// wrong state sequence: backward rotation
+			ui16_cadence_sensor_ticks = 0;
+			ui8_cadence_calc_ref_state = NO_PAS_REF;
+			goto skip_cadence;
+		}
+
+		ui16_cadence_sensor_ticks_counter_min = ui16_cadence_sensor_ticks_counter_min_speed_adjusted;
+
+		if (ui8_pas_state == ui8_cadence_calc_ref_state) {
+			// ui16_cadence_calc_counter is valid for cadence calculation
+			ui16_cadence_sensor_ticks = ui16_cadence_calc_counter;
+			ui16_cadence_calc_counter = 0;
 			
-            // for overrun problem
-            ui16_cadence_sensor_ticks_stop = (ui16_cadence_sensor_ticks + (ui16_cadence_sensor_ticks >> 1));
+			// for overrun problem
+			ui16_cadence_sensor_ticks_stop = (ui16_cadence_sensor_ticks + (ui16_cadence_sensor_ticks >> 1));
+			
+			// software based Schmitt trigger to stop motor jitter when at resolution limits
+			ui16_cadence_sensor_ticks_counter_min += CADENCE_SENSOR_STANDARD_MODE_SCHMITT_TRIGGER_THRESHOLD;
+		} else if (ui8_cadence_calc_ref_state == NO_PAS_REF) {
+			// this is the new reference state for cadence calculation
+			ui8_cadence_calc_ref_state = ui8_pas_state;
+			ui16_cadence_calc_counter = 0;
+		} else if (ui16_cadence_sensor_ticks == 0) {
+			// Waiting the second reference transition: set the cadence to 7 RPM for immediate start
+			ui16_cadence_sensor_ticks = CADENCE_TICKS_STARTUP;
+		}
+		// Reference state for crank revolution counter increment
+		if (ui8_pas_state == 0)
+			ui32_crank_revolutions_x20++;
 
-            // reset ticks counter
-            ui16_cadence_sensor_ticks_counter = 0;
-            
-            // software based Schmitt trigger to stop motor jitter when at resolution limits
-            ui16_cadence_sensor_ticks_counter_min += CADENCE_SENSOR_ADVANCED_MODE_SCHMITT_TRIGGER_THRESHOLD;
-          }
-        }
-        
-      break;
-      
-      case CALIBRATION_MODE:
-        
-        #define CADENCE_SENSOR_CALIBRATION_MODE_TICKS_COUNTER_MIN   20000
-        
-        // set the ticks counter limit
-        ui16_cadence_sensor_ticks_counter_min = CADENCE_SENSOR_CALIBRATION_MODE_TICKS_COUNTER_MIN;
-        
-        // check if first transition
-        if (!ui8_cadence_sensor_ticks_counter_started)
-        {
-          // start cadence sensor ticks counter as this is the first transition
-          ui8_cadence_sensor_ticks_counter_started = 1;
-        }
-        else
-        {
-          // set the cadence sensor ticks depending on pin state
-          if (ui8_cadence_sensor_pin_1_state)
-          {
-            // pin state is high so previous pin state was low
-            ui16_cadence_sensor_ticks_counter_min_low = ui16_cadence_sensor_ticks_counter;
-          }
-          else
-          {
-            // pin state is low so previous pin state was high
-            ui16_cadence_sensor_ticks_counter_min_high = ui16_cadence_sensor_ticks_counter;
-          }
-          
-          // reset ticks counter
-          ui16_cadence_sensor_ticks_counter = 0;
-        }
-        
-      break;
-    }
-  }
-  
-  // increment and also limit the ticks counter
-  if ((ui8_cadence_sensor_ticks_counter_started) && (ui16_cadence_sensor_ticks_counter < ui16_cadence_sensor_ticks_counter_min)) 
-  {
-    ++ui16_cadence_sensor_ticks_counter;
-  }
-  else
-  {
-    // reset variables
-    ui16_cadence_sensor_ticks = 0;
-    ui16_cadence_sensor_ticks_counter = 0;
-    ui8_cadence_sensor_ticks_counter_started = 0;
-  }
-  
+		skip_cadence:
+		// reset the counter used to detect pedal stop
+		ui16_cadence_stop_counter = 0;
+		// save current PAS state
+		ui8_pas_state_old = ui8_pas_state;
+	}
+
+
+	if (++ui16_cadence_stop_counter >  ui16_cadence_sensor_ticks_counter_min) {
+		// pedals stop detected
+		ui16_cadence_sensor_ticks = 0;
+		ui16_cadence_stop_counter = 0;
+		ui8_cadence_calc_ref_state = NO_PAS_REF;
+	} else if (ui8_cadence_calc_ref_state != NO_PAS_REF) {
+		// increment cadence tick counter
+		++ui16_cadence_calc_counter;
+	}
+
   // for overrun problem
   if(ui8_fix_overrun_enabled)
   {
-	// disable overrun at pedal start
-	if((ui8_assist_without_pedal_rotation_threshold == 0)||(ui8_cadence_sensor_start_counter >= CADENCE_SENSOR_START_THRESHOLD))
+	if(ui16_cadence_sensor_ticks)
 	{
-		if(ui16_cadence_sensor_ticks)
-		{
-			if(ui16_cadence_sensor_ticks_counter > ui16_cadence_sensor_ticks_stop)
-				ui8_cadence_sensor_stop_flag = 1;
-			else
-				ui8_cadence_sensor_stop_flag = 0;
-		}
+		if(ui16_cadence_calc_counter > ui16_cadence_sensor_ticks_stop)
+			ui8_cadence_sensor_stop_flag = 1;
 		else
-		{
-		ui8_cadence_sensor_stop_flag = 1;
-		}
+			ui8_cadence_sensor_stop_flag = 0;
 	}
 	else
 	{
-		ui8_cadence_sensor_stop_flag = 0;
+		ui8_cadence_sensor_stop_flag = 1;
 	}
-	
-	// restart counter for overrun disabled at pedal start
-	if(!ui8_cadence_sensor_ticks_counter_started)
-		ui8_cadence_sensor_start_counter = 0;
   }
   else
   {
 	ui8_cadence_sensor_stop_flag = 0;
   }
-  
+
   /****************************************************************************/
-  
-  
-  
+
+
+
   static uint16_t ui16_wheel_speed_sensor_ticks_counter;
   static uint8_t ui8_wheel_speed_sensor_ticks_counter_started;
   static uint8_t ui8_wheel_speed_sensor_pin_state_old;
-  
+
   // check wheel speed sensor pin state
   uint8_t ui8_wheel_speed_sensor_pin_state = WHEEL_SPEED_SENSOR__PORT->IDR & WHEEL_SPEED_SENSOR__PIN;
-  
+
   // check if wheel speed sensor pin state has changed
   if (ui8_wheel_speed_sensor_pin_state != ui8_wheel_speed_sensor_pin_state_old)
-  { 
+  {
     // update old wheel speed sensor pin state
     ui8_wheel_speed_sensor_pin_state_old = ui8_wheel_speed_sensor_pin_state;
-    
+
     // only consider the 0 -> 1 transition
     if (ui8_wheel_speed_sensor_pin_state)
     {
       // check if first transition
-      if (!ui8_wheel_speed_sensor_ticks_counter_started) 
+      if (!ui8_wheel_speed_sensor_ticks_counter_started)
       {
         // start wheel speed sensor ticks counter as this is the first transition
         ui8_wheel_speed_sensor_ticks_counter_started = 1;
@@ -1056,56 +650,22 @@ void TIM1_CAP_COM_IRQHandler(void) __interrupt(TIM1_CAP_COM_IRQHANDLER)
       }
     }
   }
-  
+
   // increment and also limit the ticks counter
-  if ((ui8_wheel_speed_sensor_ticks_counter_started) && (ui16_wheel_speed_sensor_ticks_counter < WHEEL_SPEED_SENSOR_TICKS_COUNTER_MIN))
-  {
-    ++ui16_wheel_speed_sensor_ticks_counter;
-  }
-  else
-  {
-    // reset variables
-    ui16_wheel_speed_sensor_ticks = 0;
-    ui16_wheel_speed_sensor_ticks_counter = 0;
-    ui8_wheel_speed_sensor_ticks_counter_started = 0;
-  }
-
-
-
-  /****************************************************************************/
-
-//  static uint8_t ui8_first_time_run_flag;
-//
-//  // reload watchdog timer, every PWM cycle to avoid automatic reset of the microcontroller
-//  if (!ui8_first_time_run_flag)
-//  { // from the init of watchdog up to first reset on PWM cycle interrupt,
-//    // it can take up to 250ms and so we need to init here inside the PWM cycle
-//    ui8_first_time_run_flag = 1;
-//    watchdog_init ();
-//  }
-//  else
-//  {
-//    IWDG->KR = IWDG_KEY_REFRESH; // reload watch dog timer counter
-//  }
-
-
-  /****************************************************************************/
+  if (ui8_wheel_speed_sensor_ticks_counter_started)
+      if (ui16_wheel_speed_sensor_ticks_counter < WHEEL_SPEED_SENSOR_TICKS_COUNTER_MIN) {
+          ++ui16_wheel_speed_sensor_ticks_counter;
+      } else {
+          // reset variables
+          ui16_wheel_speed_sensor_ticks = 0;
+          ui16_wheel_speed_sensor_ticks_counter = 0;
+          ui8_wheel_speed_sensor_ticks_counter_started = 0;
+      }
 
 
   // clears the TIM1 interrupt TIM1_IT_UPDATE pending bit
   TIM1->SR1 = (uint8_t)(~(uint8_t)TIM1_IT_CC4);
 }
-
-void motor_disable_PWM(void)
-{
-  TIM1_CtrlPWMOutputs(DISABLE);
-}
-
-void motor_enable_PWM(void)
-{
-  TIM1_CtrlPWMOutputs(ENABLE);
-}
-
 
 void hall_sensor_init(void)
 {
@@ -1137,7 +697,7 @@ void read_battery_voltage(void)
   
   // low pass filter the voltage readed value, to avoid possible fast spikes/noise
   ui16_adc_battery_voltage_accumulated -= ui16_adc_battery_voltage_accumulated >> READ_BATTERY_VOLTAGE_FILTER_COEFFICIENT;
-  ui16_adc_battery_voltage_accumulated += UI16_ADC_10_BIT_BATTERY_VOLTAGE;
+  ui16_adc_battery_voltage_accumulated += ui16_adc_read_battery_voltage_10b();
   ui16_adc_battery_voltage_filtered = ui16_adc_battery_voltage_accumulated >> READ_BATTERY_VOLTAGE_FILTER_COEFFICIENT;
   
   // prototype filter, do not use, not tuned, ask Leon
@@ -1169,6 +729,7 @@ void read_battery_current(void)
 
 void calc_foc_angle(void)
 {
+  static uint16_t ui16_foc_angle_accumulated;
   uint16_t ui16_temp;
   uint16_t ui16_e_phase_voltage;
   uint32_t ui32_i_phase_current_x2;
@@ -1197,11 +758,12 @@ void calc_foc_angle(void)
   }
   else
   {
-    ui32_i_phase_current_x2 = 0;
+    ui8_g_foc_angle = 0;
+    goto skip_foc;
   }
 
   // calc W angular velocity: erps * 6.3
-  ui32_w_angular_velocity_x16 = ui16_motor_speed_erps * 101;
+  ui32_w_angular_velocity_x16 = (uint32_t)ui16_motor_speed_erps * 101;
 
   // ---------------------------------------------------------------------------------------------------------------------
   // NOTE: EXPERIMENTAL and may not be good for the brushless motor inside TSDZ2
@@ -1244,8 +806,8 @@ void calc_foc_angle(void)
   // calc FOC angle
   ui8_g_foc_angle = asin_table(ui16_iwl_128 / ui16_e_phase_voltage);
 
+  skip_foc:
   // low pass filter FOC angle
-  static uint16_t ui16_foc_angle_accumulated;
   ui16_foc_angle_accumulated -= ui16_foc_angle_accumulated >> 4;
   ui16_foc_angle_accumulated += ui8_g_foc_angle;
   ui8_g_foc_angle = ui16_foc_angle_accumulated >> 4;
@@ -1269,7 +831,6 @@ uint8_t asin_table (uint8_t ui8_inverted_angle_x128)
   // first value of table is 0 so ui8_index will always increment to at least 1 and return 0
   return ui8_index--;
 }
-
 
 void motor_enable_pwm(void)
 {

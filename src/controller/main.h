@@ -15,16 +15,16 @@
 
 
 // motor 
-#define PWM_CYCLES_COUNTER_MAX                    				  3800    // 5 erps minimum speed; 1/5 = 200ms; 200ms/52.6us = 3800
-#define PWM_CYCLES_SECOND                         				  19011L  // 1 / 52.6us(PWM period)
+#define PWM_CYCLES_COUNTER_MAX                                    3600U    // 5 erps minimum speed -> 1/5 = 200 ms; 200 ms / 50 us = 4000 (3125 at 15.625KHz)
+#define PWM_CYCLES_SECOND                                         18000U   // 1 / 50us(PWM period)
 #define PWM_DUTY_CYCLE_MAX                                        254
 #define MIDDLE_PWM_DUTY_CYCLE_MAX                                 (PWM_DUTY_CYCLE_MAX / 2)
 
-#define PWM_DUTY_CYCLE_RAMP_UP_INVERSE_STEP_DEFAULT               200     // 160 -> 160 * 53 us for every duty cycle increment 
-#define PWM_DUTY_CYCLE_RAMP_UP_INVERSE_STEP_MIN                   24      // 20 -> 20 * 53 us for every duty cycle increment 
+#define PWM_DUTY_CYCLE_RAMP_UP_INVERSE_STEP_DEFAULT               180     // 160 -> 160 * 64 us for every duty cycle increment
+#define PWM_DUTY_CYCLE_RAMP_UP_INVERSE_STEP_MIN                   24      // 20 -> 20 * 64 us for every duty cycle increment
 
-#define PWM_DUTY_CYCLE_RAMP_DOWN_INVERSE_STEP_DEFAULT             50      // 40 -> 40 * 53 us for every duty cycle decrement 
-#define PWM_DUTY_CYCLE_RAMP_DOWN_INVERSE_STEP_MIN                 10       // 8 -> 8 * 53 us for every duty cycle decrement
+#define PWM_DUTY_CYCLE_RAMP_DOWN_INVERSE_STEP_DEFAULT             46      // 40 -> 40 * 64 us for every duty cycle decrement
+#define PWM_DUTY_CYCLE_RAMP_DOWN_INVERSE_STEP_MIN                 10       // 8 -> 8 * 64 us for every duty cycle decrement
 
 /*---------------------------------------------------------
   NOTE: regarding duty cycle (PWM) ramping
@@ -60,7 +60,7 @@
 
 
 #define MOTOR_OVER_SPEED_ERPS                     700 // 675 is equal to 120 cadence, as TSDZ2 has a reduciton ratio of 41.8
-#define MOTOR_SPEED_FIELD_WEAKEANING_MIN          500 //  cadence at 90 
+#define MOTOR_SPEED_FIELD_WEAKEANING_MIN          450 //  cadence at 80 
 
 #define MOTOR_ROTOR_ERPS_START_INTERPOLATION_60_DEGREES           10
 
@@ -105,15 +105,14 @@
 
 
 // cadence sensor
-#define CADENCE_SENSOR_NUMBER_MAGNETS                             20
-#define CADENCE_SENSOR_NUMBER_MAGNETS_X2                          (CADENCE_SENSOR_NUMBER_MAGNETS * 2)
+#define CADENCE_SENSOR_NUMBER_MAGNETS                           20
+#define CADENCE_SENSOR_NUMBER_MAGNETS_X2                        CADENCE_SENSOR_NUMBER_MAGNETS * 2)
 
-#define CADENCE_SENSOR_TICKS_COUNTER_MAX                          350
-#define CADENCE_SENSOR_TICKS_COUNTER_MIN                          10000
-
-#define CADENCE_SENSOR_PULSE_PERCENTAGE_X10_DEFAULT               500
-#define CADENCE_SENSOR_PULSE_PERCENTAGE_X10_MAX                   800
-#define CADENCE_SENSOR_PULSE_PERCENTAGE_X10_MIN                   200
+#define CADENCE_SENSOR_CALC_COUNTER_MIN                         4032  // 3500 at 15.625KHz
+// ui16_cadence_sensor_ticks value for startup
+#define CADENCE_TICKS_STARTUP                                   7200 // about 7-8 RPM (6250 at 15.625KHz)
+// software based Schmitt trigger to stop motor jitter when at resolution limits
+#define CADENCE_SENSOR_STANDARD_MODE_SCHMITT_TRIGGER_THRESHOLD  403  // 350 at 15.625KHz
 
 /*-------------------------------------------------------------------------------
   NOTE: regarding the cadence sensor
@@ -121,41 +120,17 @@
   CADENCE_SENSOR_NUMBER_MAGNETS = 20, this is the number of magnets used for
   the cadence sensor. 
   
-  x = (1/(150RPM/60)) / (0.000053)
-  
-  7625 / CADENCE_SENSOR_NUMBER_MAGNETS ≈ 381 -> 150 RPM 
-  
-  114375 / CADENCE_SENSOR_NUMBER_MAGNETS ≈ 5718 -> 10 RPM 
-  
-  CADENCE_SENSOR_TICKS_COUNTER_MAX = x / CADENCE_SENSOR_NUMBER_MAGNETS
-  
-
-  
-  CADENCE_SENSOR_NUMBER_MAGNETS_X2 = 40, this is the number of transitions 
-  in one crank revolution
-  
-  x = (1/(150RPM/60)) / (0.000053)
-  
-  7625 / CADENCE_SENSOR_NUMBER_MAGNETS_X2 ≈ 190 -> 150 RPM
-  
-  114375 / CADENCE_SENSOR_NUMBER_MAGNETS_X2 ≈ 2859 -> 10 RPM
-  
-  CADENCE_SENSOR_TICKS_COUNTER_MAX = x / CADENCE_SENSOR_NUMBER_MAGNETS_X2
-  
-  
-  
   Cadence is calculated by counting how much time passes between two 
   transitions. Depending on if all transitions are measured or simply 
   transitions of the same kind it is important to adjust the calculation of 
-  pedal cadence. If measuring all transistions it is also important to 
-  adjust for the different spacings between the transitions.
+  pedal cadence.
 -------------------------------------------------------------------------------*/
 
 
 
 // Wheel speed sensor
-#define WHEEL_SPEED_SENSOR_TICKS_COUNTER_MAX                      165   // something like 200 m/h with a 6'' wheel
-#define WHEEL_SPEED_SENSOR_TICKS_COUNTER_MIN                      39976 // could be a bigger number but will make for a slow detection of stopped wheel speed
+#define WHEEL_SPEED_SENSOR_TICKS_COUNTER_MAX                      155   // (135 at 15,625KHz) something like 200 m/h with a 6'' wheel
+#define WHEEL_SPEED_SENSOR_TICKS_COUNTER_MIN                      37747 // could be a bigger number but will make for a slow detection of stopped wheel speed
 
 // default values
 #define DEFAULT_VALUE_BATTERY_CURRENT_MAX                         10  // 10 amps
@@ -199,7 +174,7 @@
 
 
 // ADC battery current measurement
-#define BATTERY_CURRENT_PER_10_BIT_ADC_STEP_X512                  102
+#define BATTERY_CURRENT_PER_10_BIT_ADC_STEP_X512                  80
 #define BATTERY_CURRENT_PER_10_BIT_ADC_STEP_X100                  17  // conversion value verified with a cheap power meter
 
 
