@@ -439,7 +439,6 @@ static void apply_emtb_assist()
 
 static void apply_walk_assist()
 {
-  #define WALK_ASSIST_DUTY_CYCLE_RAMP_UP_INVERSE_STEP     200
   #define WALK_ASSIST_DUTY_CYCLE_MAX                      80
   #define WALK_ASSIST_ADC_BATTERY_CURRENT_MAX             80
   
@@ -467,11 +466,10 @@ static void apply_walk_assist()
 
 static void apply_cruise()
 {
-  #define CRUISE_PID_KP                             6   // 48 volt motor: 6, 36 volt motor: 7
-  #define CRUISE_PID_KI                             0.6   // 48 volt motor: 0.5, 36 volt motor: 0.35
+  #define CRUISE_PID_KP                             12   
+  #define CRUISE_PID_KI                             0.9   
   #define CRUISE_PID_INTEGRAL_LIMIT                 1000
   #define CRUISE_PID_KD                             0
-  #define CRUISE_DUTY_CYCLE_RAMP_UP_INVERSE_STEP    100
   
   if (ui16_wheel_speed_x10 > CRUISE_THRESHOLD_SPEED_X10)
   {
@@ -560,8 +558,6 @@ static void apply_cruise()
 
 static void apply_throttle()
 {
-  #define THROTTLE_DUTY_CYCLE_RAMP_UP_INVERSE_STEP_DEFAULT    80
-  #define THROTTLE_DUTY_CYCLE_RAMP_UP_INVERSE_STEP_MIN        40
   
   // map value from 0 to 255
   ui8_adc_throttle = map((uint8_t) UI8_ADC_THROTTLE,
