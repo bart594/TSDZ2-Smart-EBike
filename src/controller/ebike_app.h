@@ -13,8 +13,11 @@
 #include "main.h"
 
 // cadence sensor
-extern volatile uint16_t ui16_cadence_sensor_ticks_counter_min_speed_adjusted;
+extern uint16_t ui16_cadence_sensor_ticks_counter_min_speed_adjusted;
 extern volatile uint8_t ui8_assist_without_pedal_rotation_threshold;
+
+// Torque sensor coaster brake engaged threshold value
+extern uint16_t ui16_adc_pedal_torque_offset;
 
 typedef struct _configuration_variables
 {
