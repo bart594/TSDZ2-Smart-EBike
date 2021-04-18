@@ -568,7 +568,7 @@ void TIM1_CAP_COM_IRQHandler(void) __interrupt(TIM1_CAP_COM_IRQHANDLER)
 		    // check to enable field weakening state
      if (ui8_field_weakening_enabled &&
      (ui8_g_duty_cycle == PWM_DUTY_CYCLE_MAX) &&
-     (ui8_fw_angle > 4)){ // do not enable at low motor speed / low cadence
+     (ui8_fw_angle_max > 3)){ // do not enable at low cadence
       ui8_field_weakening_state_enabled = 1;}else{ui8_field_weakening_state_enabled = 0;}
 	  
         // check if to decrease, increase or maintain duty cycle
