@@ -11,10 +11,9 @@
 
 #include <stdint.h>
 
-
 // motor states
 #define BLOCK_COMMUTATION 			            0
-#define SINEWAVE_INTERPOLATION_60_DEGREES 	    1
+#define SINEWAVE_INTERPOLATION_60_DEGREES 	    0x80
 
 // power variables
 extern volatile uint8_t ui8_controller_duty_cycle_ramp_up_inverse_step;
@@ -24,8 +23,11 @@ extern volatile uint8_t ui8_adc_battery_voltage_cut_off;
 extern volatile uint8_t ui8_adc_battery_current_filtered;
 extern volatile uint8_t ui8_controller_adc_battery_current_target;
 extern volatile uint8_t ui8_g_duty_cycle;
+extern volatile uint8_t ui8_fw_hall_counter_offset;
+extern volatile uint16_t ui16_hall_counter_total;
 extern volatile uint8_t ui8_controller_duty_cycle_target;
 extern volatile uint8_t ui8_g_foc_angle;
+extern volatile uint16_t ui16_hall_calib_cnt[6];
 
 // motor erps
 extern volatile uint16_t ui16_motor_speed_erps;
@@ -37,9 +39,6 @@ extern volatile uint8_t ui8_brake_state;
 extern volatile uint16_t ui16_cadence_sensor_ticks;
 extern volatile uint32_t ui32_crank_revolutions_x20;
 
-// for overrun problem
-extern volatile uint8_t ui8_fix_overrun_enabled;
-
 // wheel speed sensor
 extern volatile uint16_t ui16_wheel_speed_sensor_ticks;
 extern volatile uint32_t ui32_wheel_speed_sensor_ticks_total;
@@ -47,7 +46,6 @@ extern volatile uint32_t ui32_wheel_speed_sensor_ticks_total;
 void hall_sensor_init(void); // must be called before using the motor
 
 // field weakening
-extern volatile uint8_t ui8_fw_angle;
 extern volatile uint8_t ui8_field_weakening_enabled;
 extern volatile uint8_t ui8_field_weakening_state_enabled;
 

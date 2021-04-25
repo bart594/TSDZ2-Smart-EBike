@@ -18,10 +18,8 @@ PLATFORM = stm8
 PNAME = main
 
 #Directory for helpers
-IDIR = ../common/STM8S_StdPeriph_Lib/inc
-SDIR = ../common/STM8S_StdPeriph_Lib/src
-SDIR1 = ../common
-IDIR1 = ../common
+IDIR = STM8S_StdPeriph_Lib/inc
+SDIR = STM8S_StdPeriph_Lib/src
 
 # In case you ever want a different name for the main source file
 MAINSRC = $(PNAME).c
@@ -38,11 +36,11 @@ ELF_SECTIONS_TO_REMOVE = -R DATA -R INITIALIZED -R SSEG -R .debug_line -R .debug
 	$(SDIR)/stm8s_tim1.c \
 	$(SDIR)/stm8s_tim2.c \
 	$(SDIR)/stm8s_tim3.c \
+    $(SDIR)/stm8s_tim4.c \
 	$(SDIR)/stm8s_exti.c \
 	$(SDIR)/stm8s_adc1.c \
 	$(SDIR)/stm8s_flash.c \
-	$(SDIR1)/common.c \
-	watchdog.c \
+	common.c \
 	torque_sensor.c \
 	uart.c \
 	pwm.c \
@@ -53,18 +51,17 @@ ELF_SECTIONS_TO_REMOVE = -R DATA -R INITIALIZED -R SSEG -R .debug_line -R .debug
 	adc.c \
 	timers.c \
 	ebike_app.c \
-	eeprom.c \
 	lights.c \
 
-HEADERS = watchdog.h torque_sensor.h interrupts.h main.h uart.h pwm.h motor.h wheel_speed_sensor.h brake.h pas.h adc.h timers.h \
-ebike_app.h pins.h eeprom.h lights.h
+HEADERS = torque_sensor.h interrupts.h main.h uart.h pwm.h motor.h wheel_speed_sensor.h brake.h pas.h adc.h timers.h \
+ebike_app.h pins.h lights.h
 
 # The list of .rel files can be derived from the list of their source files
 RELS = $(EXTRASRCS:.c=.rel)
 
-INCLUDES = -I$(IDIR) -I$(IDIR1) -I. -I../
-CFLAGS = -m$(PLATFORM) -Ddouble=float --std-c99 --nolospre 
-ELF_FLAGS = --out-fmt-ihx --debug
+INCLUDES = -I$(IDIR) -I.
+CFLAGS = -m$(PLATFORM) -Ddouble=float --std-c99 --nolospre --opt-code-speed --peep-asm --peep-file peep.txt
+ELF_FLAGS = --out-fmt-ihx
 LIBS =
 
 # This just provides the conventional target name "all"; it is optional

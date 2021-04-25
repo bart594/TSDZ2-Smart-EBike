@@ -1,7 +1,7 @@
 /*
  * TongSheng TSDZ2 motor controller firmware/
  *
- * Copyright (C) Casainho, 2018.
+ * Copyright (C) Casainho, MSpider65 2020.
  *
  * Released under the GPL License, Version 3
  */
@@ -17,11 +17,7 @@
 void uart2_init (void)
 {
   UART2_DeInit();
-#ifdef DEBUG_UART
-  UART2_Init((uint32_t) 115200,
-#else
   UART2_Init((uint32_t) 19200,
-#endif
 	     UART2_WORDLENGTH_8D,
 	     UART2_STOPBITS_1,
 	     UART2_PARITY_NO,

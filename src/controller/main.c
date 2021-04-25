@@ -1,7 +1,7 @@
 /*
  * TongSheng TSDZ2 motor controller firmware/
  *
- * Copyright (C) Casainho and Leon, 2019.
+ * Copyright (C) Casainho, Leon, MSpider65 2020.
  *
  * Released under the GPL License, Version 3
  */
@@ -21,14 +21,13 @@
 #include "timers.h"
 #include "ebike_app.h"
 #include "torque_sensor.h"
-#include "eeprom.h"
 #include "lights.h"
 
 /////////////////////////////////////////////////////////////////////////////////////////////
 //// Functions prototypes
 
 // main -- start of firmware and main loop
-int main (void);
+int main(void);
 
 // With SDCC, interrupt service routine function prototypes must be placed in the file that contains main ()
 // in order for an vector for the interrupt to be placed in the the interrupt vector space.  It's acceptable
@@ -47,81 +46,68 @@ int main (void);
 // *** buffer overflow detected ***: sdcc terminated
 // Caught signal 6: SIGABRT
 
-// PWM cycle interrupt
+#ifdef __CDT_PARSER__
+#define __interrupt(x)
+#endif
+// PWM cycle interrupt (called every 64us)
 void TIM1_CAP_COM_IRQHandler(void) __interrupt(TIM1_CAP_COM_IRQHANDLER);
-void EXTI_PORTC_IRQHandler(void) __interrupt(EXTI_PORTC_IRQHANDLER);
+// UART Receive interrupt
 void UART2_RX_IRQHandler(void) __interrupt(UART2_RX_IRQHANDLER);
+// UART TX interrupt
 void UART2_TX_IRQHandler(void) __interrupt(UART2_TX_IRQHANDLER);
+// TIM4 Overflow interrupt (called every 1ms)
+void TIM4_IRQHandler(void) __interrupt(TIM4_OVF_IRQHANDLER);
+// Hall Sensor Signal interrupt
+void HALL_SENSOR_A_PORT_IRQHandler(void) __interrupt(EXTI_HALL_A_IRQ);
+void HALL_SENSOR_B_PORT_IRQHandler(void) __interrupt(EXTI_HALL_B_IRQ);
+void HALL_SENSOR_C_PORT_IRQHandler(void) __interrupt(EXTI_HALL_C_IRQ);
 
 /////////////////////////////////////////////////////////////////////////////////////////////
 /////////////////////////////////////////////////////////////////////////////////////////////
 
-int main (void)
-{
-  uint16_t ui16_TIM3_counter = 0;
-  uint16_t ui16_ebike_app_controller_counter = 0;
-  uint16_t ui16_motor_controller_counter = 0;
-  uint16_t ui16_debug_uart_counter = 0;
 
-  uint16_t ui16_temp = 0, ui16_throttle_value_filtered = 0;
+int main(void) {
+    uint8_t ui8_1ms_counter = 0;
+    uint16_t ui16_ebike_app_controller_counter = 0;
+    uint16_t ui16_motor_controller_counter = 0;
 
-  // set clock at the max 16 MHz
-  CLK_HSIPrescalerConfig(CLK_PRESCALER_HSIDIV1);
+    // set clock at the max 16 MHz
+    CLK_HSIPrescalerConfig(CLK_PRESCALER_HSIDIV1);
 
-  brake_init();
-  while (brake_is_set()) ; // hold here while brake is pressed -- this is a protection for development
-  lights_init();
-  uart2_init();
-  timer2_init();
-  timer3_init();
-  adc_init();
-  torque_sensor_init();
-  pas_init();
-  wheel_speed_sensor_init();
-  hall_sensor_init();
-  EEPROM_init(); // needed for pwm_init_bipolar_4q
-  pwm_init_bipolar_4q();
-  enableInterrupts();
-  
-  while (1)
-  {
-    // because of continue; at the end of each if code block that will stop the while (1) loop there,
-    // the first if block code will have the higher priority over any others
-    ui16_TIM3_counter = TIM3_GetCounter();
-    if((ui16_TIM3_counter - ui16_motor_controller_counter) > 4) // every 4ms
-    {
-      ui16_motor_controller_counter = ui16_TIM3_counter;
-      motor_controller();
-      continue;
+    brake_init();
+    while (GPIO_ReadInputPin(BRAKE__PORT, BRAKE__PIN) == 0)
+        ; // hold here while brake is pressed -- this is a protection for development
+    adc_init();
+    lights_init();
+    uart2_init();
+    timers_init();
+    torque_sensor_init();
+    pas_init();
+    wheel_speed_sensor_init();
+    pwm_init();
+    hall_sensor_init();
+    enableInterrupts();
+
+    while (1) {
+        // because of continue, the first if block code will have higher priority over the other
+        ui8_1ms_counter = ui8_tim4_counter;
+        // run every 4ms. Max measured motor_controller() duration is 0,15ms
+        if ((ui8_1ms_counter - ui16_motor_controller_counter) > 4) {
+
+            ui16_motor_controller_counter = ui8_1ms_counter;
+            motor_controller();
+
+            continue;
+        }
+
+        ui8_1ms_counter = ui8_tim4_counter;
+        // run every 30ms. Max measured ebike_app_controller() duration is 3,1 ms.
+        if ((ui8_1ms_counter - ui16_ebike_app_controller_counter) > 30) {
+
+
+            ui16_ebike_app_controller_counter = ui8_1ms_counter;
+            ebike_app_controller();
+
+         }
     }
-
-    ui16_TIM3_counter = TIM3_GetCounter();
-    if((ui16_TIM3_counter - ui16_ebike_app_controller_counter) > 30) // every 30ms
-    {
-      ui16_ebike_app_controller_counter = ui16_TIM3_counter;
-      ebike_app_controller();
-      continue;
-    }
-
-    #ifdef DEBUG_UART
-    
-    ui16_TIM3_counter = TIM3_GetCounter();
-    
-    if((ui16_TIM3_counter - ui16_debug_uart_counter) > 50)
-    {
-      ui16_debug_uart_counter = ui16_TIM3_counter;
-
-      // sugestion: no more than 6 variables printed (takes about 3ms to printf 6 variables)
-      printf "%d,%d,%d,%d\n",
-      ui16_motor_get_motor_speed_erps(),
-      ui8_duty_cycle,
-      ui8_adc_battery_current,
-      ui8_foc_angle
-      );
-    }
-    
-    #endif
-  }
-
-  return 0;
 }
