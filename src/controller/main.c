@@ -66,11 +66,12 @@ void HALL_SENSOR_C_PORT_IRQHandler(void) __interrupt(EXTI_HALL_C_IRQ);
 /////////////////////////////////////////////////////////////////////////////////////////////
 
 
-int main(void) {
-    uint8_t ui8_1ms_counter = 0;
-    uint16_t ui16_ebike_app_controller_counter = 0;
-    uint16_t ui16_motor_controller_counter = 0;
 
+static uint8_t ui8_1ms_counter = 0;
+static uint8_t ui8_ebike_app_controller_counter = 0;
+static uint8_t ui8_motor_controller_counter = 0;
+
+int main(void) {
     // set clock at the max 16 MHz
     CLK_HSIPrescalerConfig(CLK_PRESCALER_HSIDIV1);
 
@@ -91,23 +92,21 @@ int main(void) {
     while (1) {
         // because of continue, the first if block code will have higher priority over the other
         ui8_1ms_counter = ui8_tim4_counter;
-        // run every 4ms. Max measured motor_controller() duration is 0,15ms
-        if ((ui8_1ms_counter - ui16_motor_controller_counter) > 4) {
+        // run every 5ms. Max measured motor_controller() duration is 0,15ms
+        if ((uint8_t)(ui8_1ms_counter - ui8_motor_controller_counter) >= 5U) {
 
-            ui16_motor_controller_counter = ui8_1ms_counter;
+            ui8_motor_controller_counter = ui8_1ms_counter;
             motor_controller();
 
             continue;
         }
 
-        ui8_1ms_counter = ui8_tim4_counter;
-        // run every 30ms. Max measured ebike_app_controller() duration is 3,1 ms.
-        if ((ui8_1ms_counter - ui16_ebike_app_controller_counter) > 30) {
+        // run every 25ms. Max measured ebike_app_controller() duration is 3,1 ms.
+        if ((uint8_t)(ui8_1ms_counter - ui8_ebike_app_controller_counter) >= 25U) {
 
-
-            ui16_ebike_app_controller_counter = ui8_1ms_counter;
+            ui8_ebike_app_controller_counter = ui8_1ms_counter;
             ebike_app_controller();
 
-         }
+        }
     }
 }
